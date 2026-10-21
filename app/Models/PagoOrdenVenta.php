@@ -17,7 +17,6 @@ class PagoOrdenVenta extends Model
     protected $fillable = [
         'orden_venta_id',
         'metodo_pago_id',
-        'moneda_id',
         'monto',
         'tasa_cambio',
         'monto_base',
@@ -40,10 +39,5 @@ class PagoOrdenVenta extends Model
     public function metodoPago(): BelongsTo
     {
         return $this->belongsTo(MetodoPago::class, 'metodo_pago_id');
-    }
-
-    public function moneda(): BelongsTo
-    {
-        return $this->belongsTo(Moneda::class, 'moneda_id');
     }
 }

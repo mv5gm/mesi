@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Almacen;
+use App\Models\Categoria;
 use App\Models\Existencia;
+use App\Models\Moneda;
 use App\Models\Producto;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -17,9 +19,34 @@ class ExistenciaController extends Controller
     public function index(): View
     {
         return view('existencias.index', [
-            'listaProductos' => Producto::orderBy('nombre')->get(['id', 'sku', 'nombre']),
             'listaAlmacenes' => $this->almacenesParaSelect(),
+            'listaCategorias' => Categoria::paraSelect(),
+            'monedaBaseId' => Moneda::where('es_moneda_base', true)->value('id'),
         ]);
+    }
+
+    public function productos(Request $request): JsonResponse
+    {
+        $busqueda = $request->string('q')->toString();
+
+        $productos = Producto::query()
+            ->select('id', 'sku', 'nombre')
+            ->orderBy('nombre')
+            ->limit(20);
+
+        if ($busqueda !== '') {
+            $productos->where(function (Builder $query) use ($busqueda): void {
+                $query->where('nombre', 'like', "%{$busqueda}%")
+                    ->orWhere('sku', 'like', "%{$busqueda}%");
+            });
+        }
+
+        return response()->json(
+            $productos->get()->map(fn (Producto $producto): array => [
+                'id' => $producto->id,
+                'text' => "{$producto->sku} — {$producto->nombre}",
+            ])->values()
+        );
     }
 
     public function data(Request $request): JsonResponse

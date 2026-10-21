@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\MetodoPago;
-use App\Models\Moneda;
 use App\Models\OrdenCompra;
 use App\Models\PagoOrdenCompra;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,7 +22,6 @@ class PagoOrdenCompraFactory extends Factory
         return [
             'orden_compra_id' => OrdenCompra::factory(),
             'metodo_pago_id' => MetodoPago::factory(),
-            'moneda_id' => Moneda::factory(),
             'monto' => fake()->randomFloat(2, 1.00, 50000.00),
             'tasa_cambio' => 1.0000,
             'monto_base' => fn (array $attributes): float => round($attributes['monto'] * $attributes['tasa_cambio'], 2),

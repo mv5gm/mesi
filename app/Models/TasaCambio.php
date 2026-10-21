@@ -25,6 +25,28 @@ class TasaCambio extends Model
         'fecha_efectiva' => 'datetime',
     ];
 
+    /**
+     * Última tasa vigente por moneda: cuántas unidades de cada moneda equivalen a 1 de la base.
+     *
+     * @return array<int, float>
+     */
+    public static function vigentes(): array
+    {
+        $vigentes = [];
+
+        static::query()
+            ->orderByDesc('fecha_efectiva')
+            ->orderByDesc('id')
+            ->get(['moneda_id', 'tasa'])
+            ->each(function (self $tasa) use (&$vigentes): void {
+                if (! array_key_exists($tasa->moneda_id, $vigentes)) {
+                    $vigentes[$tasa->moneda_id] = (float) $tasa->tasa;
+                }
+            });
+
+        return $vigentes;
+    }
+
     public function moneda(): BelongsTo
     {
         return $this->belongsTo(Moneda::class, 'moneda_id');

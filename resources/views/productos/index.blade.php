@@ -135,6 +135,7 @@
                             required
                             class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         >
+                        <p id="register-precio-venta-bs" class="mt-1 text-xs text-gray-500"></p>
                     </div>
                 </div>
 
@@ -257,6 +258,7 @@
                     <div>
                         <label for="edit-precio-venta" class="block text-sm font-medium">Precio de venta</label>
                         <input id="edit-precio-venta" type="number" name="precio_venta" step="0.01" min="0" required class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        <p id="edit-precio-venta-bs" class="mt-1 text-xs text-gray-500"></p>
                     </div>
                 </div>
 
@@ -386,6 +388,47 @@
         const categoriaOptions = @json($listaCategorias);
         const monedaOptions = @json($listaMonedas->mapWithKeys(fn ($moneda) => [$moneda->id => "{$moneda->codigo} — {$moneda->nombre}"]));
 
+        // Tasas vigentes: cuántas unidades de cada moneda equivalen a 1 dólar.
+        const tasasVigentes = @json($tasasVigentes);
+        const monedaBaseId = @json($monedaBaseId);
+        const monedaBolivarId = @json($monedaBolivarId);
+
+        function tasaDe(monedaId) {
+            return Number(tasasVigentes[monedaId] ?? 1);
+        }
+
+        function precioEnBolivares(monto, monedaId) {
+            const tasaOrigen = tasaDe(monedaId);
+            const tasaDestino = monedaBolivarId !== null ? tasaDe(monedaBolivarId) : null;
+
+            if (!tasaDestino || !tasaOrigen) {
+                return null;
+            }
+
+            return (parseFloat(monto) || 0) * (tasaDestino / tasaOrigen);
+        }
+
+        function formatoNumero(valor) {
+            return parseFloat(valor || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function actualizarEquivalenteBolivares(modo) {
+            const form = document.getElementById(modo + '-form');
+            const monedaId = form.elements['moneda_id'].value;
+            const venta = document.getElementById(modo + '-precio-venta');
+            const equivalente = document.getElementById(modo + '-precio-venta-bs');
+
+            if (!venta || !equivalente) {
+                return;
+            }
+
+            const precioBs = precioEnBolivares(venta.value, monedaId);
+
+            equivalente.textContent = precioBs === null
+                ? ''
+                : `Equivale a Bs. ${formatoNumero(precioBs)}`;
+        }
+
         function toast(message) {
             const el = document.getElementById('toast');
             el.textContent = message;
@@ -456,7 +499,8 @@
         window.openRegisterModal = function () {
             document.getElementById('register-form').reset();
             buildOptions(document.getElementById('register-categoria-id'), categoriaOptions, '', 'Selecciona una categoría');
-            buildOptions(document.getElementById('register-moneda-id'), monedaOptions, '', 'Selecciona una moneda');
+            buildOptions(document.getElementById('register-moneda-id'), monedaOptions, monedaBaseId, 'Selecciona una moneda');
+            actualizarEquivalenteBolivares('register');
             clearErrors('register-errors');
             openModal('register-modal');
         };
@@ -475,6 +519,7 @@
             buildOptions(form.elements['categoria_id'], categoriaOptions, button.dataset.categoria, 'Selecciona una categoría');
             buildOptions(form.elements['moneda_id'], monedaOptions, button.dataset.moneda, 'Selecciona una moneda');
             form.action = '/productos/' + button.dataset.id;
+            actualizarEquivalenteBolivares('edit');
             clearErrors('edit-errors');
             openModal('edit-modal');
         };
@@ -500,7 +545,16 @@
                     { data: 'nombre' },
                     { data: 'categoria', orderable: false },
                     { data: 'precio_costo' },
-                    { data: 'precio_venta' },
+                    {
+                        data: 'precio_venta',
+                        render: function (data, type, row) {
+                            if (type !== 'display') {
+                                return data;
+                            }
+
+                            return data + '<span class="block text-xs text-gray-500">' + (row.precio_venta_bolivares || '') + '</span>';
+                        },
+                    },
                     { data: 'stock' },
                     { data: 'actions', orderable: false, searchable: false },
                 ],
@@ -510,6 +564,11 @@
 
             document.getElementById('register-form').addEventListener('submit', submitForm('register-form', 'register-overlay', 'register-modal'));
             document.getElementById('edit-form').addEventListener('submit', submitForm('edit-form', 'edit-overlay', 'edit-modal'));
+
+            ['register', 'edit'].forEach((modo) => {
+                document.getElementById(modo + '-precio-venta').addEventListener('input', () => actualizarEquivalenteBolivares(modo));
+                document.getElementById(modo + '-moneda-id').addEventListener('change', () => actualizarEquivalenteBolivares(modo));
+            });
 
             function submitForm(formId, overlayId, modalId) {
                 return async function (event) {

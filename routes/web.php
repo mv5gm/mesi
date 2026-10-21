@@ -4,6 +4,7 @@ use App\Http\Controllers\AlmacenController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ClienteController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExistenciaController;
 use App\Http\Controllers\MetodoPagoController;
 use App\Http\Controllers\MonedaController;
@@ -23,9 +24,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-    Route::get('/', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::middleware('can:gestionar usuarios')->group(function () {
         Route::get('/usuarios', [UserController::class, 'index'])->name('users.index');
@@ -94,6 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:gestionar existencias')->group(function () {
         Route::get('/existencias', [ExistenciaController::class, 'index'])->name('existencias.index');
         Route::get('/existencias/datos', [ExistenciaController::class, 'data'])->name('existencias.data');
+        Route::get('/existencias/productos', [ExistenciaController::class, 'productos'])->name('existencias.productos');
         Route::post('/existencias', [ExistenciaController::class, 'store'])->name('existencias.store');
         Route::put('/existencias/{existencia}', [ExistenciaController::class, 'update'])->name('existencias.update');
         Route::delete('/existencias/{existencia}', [ExistenciaController::class, 'destroy'])->name('existencias.destroy');
@@ -110,9 +110,15 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:gestionar ventas')->group(function () {
         Route::get('/ventas', [OrdenVentaController::class, 'index'])->name('ventas.index');
         Route::get('/ventas/datos', [OrdenVentaController::class, 'data'])->name('ventas.data');
+        Route::get('/ventas/clientes-select2', [OrdenVentaController::class, 'clientesSelect2'])->name('ventas.clientes.select2');
+        Route::get('/ventas/productos-select2', [OrdenVentaController::class, 'productosSelect2'])->name('ventas.productos.select2');
+        Route::get('/ventas/producto-precio', [OrdenVentaController::class, 'productoPrecio'])->name('ventas.producto.precio');
+        Route::get('/tasas-cambio/select2', [OrdenVentaController::class, 'tasasSelect2'])->name('tasas.select2');
+        Route::get('/tasas-cambio/ultima', [OrdenVentaController::class, 'tasaUltima'])->name('tasas.ultima');
         Route::post('/ventas', [OrdenVentaController::class, 'store'])->name('ventas.store');
         Route::put('/ventas/{ordenVenta}', [OrdenVentaController::class, 'update'])->name('ventas.update');
         Route::delete('/ventas/{ordenVenta}', [OrdenVentaController::class, 'destroy'])->name('ventas.destroy');
+        Route::get('/ventas/{ordenVenta}', [OrdenVentaController::class, 'show'])->name('ventas.show');
     });
 
     Route::middleware('can:gestionar metodos de pago')->group(function () {

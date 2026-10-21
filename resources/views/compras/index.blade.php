@@ -319,7 +319,7 @@
                 <input type="hidden" name="_method" value="DELETE">
                 <h2 class="text-lg font-semibold">Eliminar compra</h2>
                 <p class="mt-2 text-sm text-gray-600">
-                    ¿Estás seguro de que deseas eliminar la orden <strong id="delete-orden-numero"></strong>? Esta acción no se puede deshacer.
+                    ¿Estás seguro de que deseas eliminar la orden <strong id="delete-orden-numero"></strong>? Se eliminarán también sus productos y sus pagos. Esta acción no se puede deshacer.
                 </p>
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" onclick="closeModal('delete-modal')" class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
@@ -404,10 +404,22 @@
         <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
+        // Tabla de compras, se recarga al registrar, editar o eliminar una orden.
+        let dataTable = null;
+
+        function recargarTabla() {
+            if (dataTable) {
+                dataTable.ajax.reload();
+            }
+        }
+
         const proveedorOptions = @json($listaProveedores);
         const monedaOptions = @json($listaMonedas->mapWithKeys(fn ($moneda) => [$moneda->id => "{$moneda->codigo} — {$moneda->nombre}"]));
         const productoOptions = @json($listaProductos->mapWithKeys(fn ($producto) => [$producto->id => "{$producto->sku} — {$producto->nombre}"]));
         const monedaBaseId = @json($monedaBaseId);
+
+        // Tasas vigentes: cuántas unidades de cada moneda equivalen a 1 dólar.
+        const tasasVigentes = @json($tasasVigentes);
 
         function toast(message) {
             const el = document.getElementById('toast');
@@ -541,7 +553,7 @@
 
             const tasa = parseFloat(document.getElementById(modo + '-tasa-cambio').value) || 0;
             document.getElementById(modo + '-total').textContent = formatoNumero(total);
-            document.getElementById(modo + '-total-base').textContent = formatoNumero(total * tasa);
+            document.getElementById(modo + '-total-base').textContent = formatoNumero(tasa > 0 ? total / tasa : 0);
         }
 
         function configurarRecalculo() {
@@ -559,10 +571,9 @@
             ['register-moneda-id', 'edit-moneda-id'].forEach((id) => {
                 document.getElementById(id).addEventListener('change', (event) => {
                     const modo = id.startsWith('register') ? 'register' : 'edit';
-                    if (String(event.target.value) === String(monedaBaseId)) {
-                        document.getElementById(modo + '-tasa-cambio').value = '1';
-                        recomputarTotales(modo + '-detalles-body');
-                    }
+                    const tasa = tasasVigentes[event.target.value] ?? 1;
+                    document.getElementById(modo + '-tasa-cambio').value = tasa;
+                    recomputarTotales(modo + '-detalles-body');
                 });
             });
         }
@@ -572,9 +583,9 @@
             const body = document.getElementById('register-detalles-body');
             body.innerHTML = '';
             buildOptions(document.getElementById('register-proveedor-id'), proveedorOptions, '', 'Selecciona un proveedor');
-            buildOptions(document.getElementById('register-moneda-id'), monedaOptions, '', 'Selecciona una moneda');
+            buildOptions(document.getElementById('register-moneda-id'), monedaOptions, monedaBaseId, 'Selecciona una moneda');
             document.getElementById('register-fecha-orden').value = new Date().toISOString().slice(0, 16);
-            document.getElementById('register-tasa-cambio').value = '1';
+            document.getElementById('register-tasa-cambio').value = tasasVigentes[monedaBaseId] ?? 1;
             document.getElementById('register-estado').value = 'PENDIENTE';
             document.getElementById('register-estado-pago').value = 'PENDIENTE';
             agregarLinea('register-detalles-body');
@@ -635,13 +646,19 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    renderErrors(form.id + '-errors', data.errors);
+                    renderErrors(form.id.replace('-form', '-errors'), data.errors);
+
+                    if (data.errors) {
+                        const firstKey = Object.keys(data.errors)[0];
+                        toast(data.errors[firstKey][0]);
+                    }
+
                     return;
                 }
 
                 toast(data.message);
                 closeModal(form.id.replace('-form', '-modal'));
-                dataTable.ajax.reload();
+                recargarTabla();
             } finally {
                 hideOverlay(overlayId);
             }
@@ -679,7 +696,7 @@
 
                 toast(data.message);
                 closeModal('delete-modal');
-                dataTable.ajax.reload();
+                recargarTabla();
             } finally {
                 hideOverlay('delete-overlay');
             }
@@ -687,7 +704,7 @@
 
         configurarRecalculo();
 
-        const dataTable = $('#compras-table').DataTable({
+        dataTable = $('#compras-table').DataTable({
             processing: true,
             serverSide: true,
             ajax: {

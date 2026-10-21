@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\MetodoPago;
 use App\Models\Moneda;
 use App\Models\Producto;
 use App\Models\TasaCambio;
@@ -191,6 +192,18 @@ class MonedaControllerTest extends TestCase
     {
         $moneda = Moneda::factory()->create();
         Producto::factory()->create(['moneda_id' => $moneda->id]);
+
+        $this->actingAs($this->adminUser())
+            ->delete("/monedas/{$moneda->id}", headers: ['Accept' => 'application/json'])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('monedas', ['id' => $moneda->id]);
+    }
+
+    public function test_moneda_with_metodos_pago_cannot_be_deleted(): void
+    {
+        $moneda = Moneda::factory()->create();
+        MetodoPago::factory()->create(['moneda_id' => $moneda->id]);
 
         $this->actingAs($this->adminUser())
             ->delete("/monedas/{$moneda->id}", headers: ['Accept' => 'application/json'])

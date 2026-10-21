@@ -42,4 +42,28 @@ class Moneda extends Model
     {
         return $this->hasMany(OrdenVenta::class, 'moneda_id');
     }
+
+    public function metodosPago(): HasMany
+    {
+        return $this->hasMany(MetodoPago::class, 'moneda_id');
+    }
+
+    /**
+     * Tasas vigentes por moneda: cuántas unidades de cada moneda equivalen a 1 de la moneda base.
+     *
+     * @return array<int, float>
+     */
+    public static function tasasVigentes(): array
+    {
+        $tasas = [];
+
+        static::query()
+            ->where('es_moneda_base', true)
+            ->get(['id'])
+            ->each(function (self $moneda) use (&$tasas): void {
+                $tasas[$moneda->id] = 1.0;
+            });
+
+        return $tasas + TasaCambio::vigentes();
+    }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MetodoPago;
+use App\Models\Moneda;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,12 +14,14 @@ class MetodoPagoController extends Controller
 {
     public function index(): View
     {
-        return view('metodos-pago.index');
+        return view('metodos-pago.index', [
+            'listaMonedas' => Moneda::orderBy('codigo')->get(['id', 'codigo', 'nombre']),
+        ]);
     }
 
     public function data(Request $request): JsonResponse
     {
-        $metodosPago = MetodoPago::query();
+        $metodosPago = MetodoPago::query()->with('moneda:id,codigo,nombre');
 
         $recordsTotal = $metodosPago->count();
 
@@ -27,7 +30,8 @@ class MetodoPagoController extends Controller
                 $query->where('nombre', 'like', "%{$search}%")
                     ->when(in_array(mb_strtolower($search), ['si', 'sí', 'no']), function (Builder $query) use ($search): void {
                         $query->orWhere('requiere_referencia', in_array(mb_strtolower($search), ['si', 'sí']));
-                    });
+                    })
+                    ->orWhereHas('moneda', fn (Builder $moneda) => $moneda->where('codigo', 'like', "%{$search}%"));
             });
         }
 
@@ -48,6 +52,7 @@ class MetodoPagoController extends Controller
 
         $data = $metodosPago->get()->map(fn (MetodoPago $metodoPago): array => [
             'nombre' => e($metodoPago->nombre),
+            'moneda' => e($metodoPago->moneda?->codigo ?? '—'),
             'requiere_referencia' => $metodoPago->requiere_referencia
                 ? '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Sí</span>'
                 : '<span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">No</span>',
@@ -67,15 +72,19 @@ class MetodoPagoController extends Controller
         $validated = $request->validate([
             'nombre' => ['required', 'string', 'max:50', 'unique:metodos_pago,nombre'],
             'requiere_referencia' => ['sometimes', 'boolean'],
+            'moneda_id' => ['required', 'integer', 'exists:monedas,id'],
         ], [
             'nombre.required' => 'El nombre es obligatorio.',
             'nombre.max' => 'El nombre no puede superar 50 caracteres.',
             'nombre.unique' => 'Ya existe un método de pago con ese nombre.',
+            'moneda_id.required' => 'Debes seleccionar la moneda del método de pago.',
+            'moneda_id.exists' => 'La moneda seleccionada no es válida.',
         ]);
 
         $metodoPago = MetodoPago::create([
             'nombre' => $validated['nombre'],
             'requiere_referencia' => $request->boolean('requiere_referencia'),
+            'moneda_id' => $validated['moneda_id'],
         ]);
 
         return response()->json(['message' => "Método de pago {$metodoPago->nombre} creado correctamente."]);
@@ -86,15 +95,19 @@ class MetodoPagoController extends Controller
         $validated = $request->validate([
             'nombre' => ['required', 'string', 'max:50', Rule::unique('metodos_pago', 'nombre')->ignore($metodoPago->id)],
             'requiere_referencia' => ['sometimes', 'boolean'],
+            'moneda_id' => ['required', 'integer', 'exists:monedas,id'],
         ], [
             'nombre.required' => 'El nombre es obligatorio.',
             'nombre.max' => 'El nombre no puede superar 50 caracteres.',
             'nombre.unique' => 'Ya existe un método de pago con ese nombre.',
+            'moneda_id.required' => 'Debes seleccionar la moneda del método de pago.',
+            'moneda_id.exists' => 'La moneda seleccionada no es válida.',
         ]);
 
         $metodoPago->fill([
             'nombre' => $validated['nombre'],
             'requiere_referencia' => $request->boolean('requiere_referencia'),
+            'moneda_id' => $validated['moneda_id'],
         ])->save();
 
         return response()->json(['message' => "Método de pago {$metodoPago->nombre} actualizado correctamente."]);

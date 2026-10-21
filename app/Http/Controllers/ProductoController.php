@@ -16,8 +16,11 @@ class ProductoController extends Controller
     public function index(): View
     {
         return view('productos.index', [
-            'listaCategorias' => $this->categoriasParaSelect(),
+            'listaCategorias' => Categoria::paraSelect(),
             'listaMonedas' => Moneda::orderBy('codigo')->get(['id', 'codigo', 'nombre', 'simbolo']),
+            'monedaBaseId' => Moneda::where('es_moneda_base', true)->value('id'),
+            'monedaBolivarId' => Moneda::where('codigo', 'VES')->value('id'),
+            'tasasVigentes' => Moneda::tasasVigentes(),
         ]);
     }
 
@@ -58,6 +61,9 @@ class ProductoController extends Controller
             $productos->skip($request->integer('start', 0))->take($length);
         }
 
+        $tasas = Moneda::tasasVigentes();
+        $monedaBolivarId = Moneda::where('codigo', 'VES')->value('id');
+
         $data = $productos->get()->map(fn (Producto $producto): array => [
             'sku' => e($producto->sku),
             'nombre' => e($producto->nombre),
@@ -66,6 +72,10 @@ class ProductoController extends Controller
                 : '<span class="text-gray-400">—</span>',
             'precio_costo' => $this->formatoPrecio($producto->precio_costo, $producto->moneda?->simbolo),
             'precio_venta' => $this->formatoPrecio($producto->precio_venta, $producto->moneda?->simbolo),
+            'precio_venta_bolivares' => $this->formatoPrecio(
+                $this->convertirABolivares((float) $producto->precio_venta, $producto->moneda_id, $tasas, $monedaBolivarId),
+                'Bs.'
+            ),
             'stock' => (int) $producto->existencias_sum_cantidad,
             'actions' => view('productos.partials.actions', ['producto' => $producto])->render(),
         ]);
@@ -87,7 +97,10 @@ class ProductoController extends Controller
             'stock_minimo' => $validated['stock_minimo'] ?? 0,
         ]);
 
-        return response()->json(['message' => "Producto {$producto->nombre} creado correctamente."]);
+        return response()->json([
+            'message' => "Producto {$producto->nombre} creado correctamente.",
+            'producto_id' => $producto->id,
+        ]);
     }
 
     public function update(Request $request, Producto $producto): JsonResponse
@@ -162,20 +175,7 @@ class ProductoController extends Controller
      */
     private function categoriasParaSelect(): Collection
     {
-        $todas = Categoria::orderBy('nombre')->get(['id', 'categoria_padre_id', 'nombre']);
-        $hijos = $todas->groupBy('categoria_padre_id');
-        $resultado = [];
-
-        $agregar = function (?int $padreId, int $nivel) use (&$agregar, $hijos, &$resultado): void {
-            foreach ($hijos->get($padreId, collect()) as $categoria) {
-                $resultado[$categoria->id] = str_repeat('— ', $nivel).$categoria->nombre;
-                $agregar($categoria->id, $nivel + 1);
-            }
-        };
-
-        $agregar(null, 0);
-
-        return collect($resultado);
+        return Categoria::paraSelect();
     }
 
     private function formatoPrecio(string|int|float $precio, ?string $simbolo): string
@@ -183,5 +183,22 @@ class ProductoController extends Controller
         $valor = number_format((float) $precio, 2, ',', '.');
 
         return $simbolo !== null ? "{$simbolo} {$valor}" : $valor;
+    }
+
+    /**
+     * Convierte un monto de la moneda del producto a bolívares.
+     *
+     * @param  array<int, float>  $tasas
+     */
+    private function convertirABolivares(float $monto, int $monedaId, array $tasas, ?int $monedaBolivarId): float
+    {
+        $tasaOrigen = $tasas[$monedaId] ?? 1.0;
+        $tasaDestino = $monedaBolivarId !== null ? ($tasas[$monedaBolivarId] ?? null) : null;
+
+        if ($tasaDestino === null || $tasaOrigen <= 0) {
+            return 0.0;
+        }
+
+        return $monto * ($tasaDestino / $tasaOrigen);
     }
 }

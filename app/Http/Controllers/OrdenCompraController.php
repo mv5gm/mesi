@@ -25,6 +25,7 @@ class OrdenCompraController extends Controller
             'listaMonedas' => Moneda::orderBy('codigo')->get(['id', 'codigo', 'nombre']),
             'listaProductos' => Producto::orderBy('nombre')->get(['id', 'sku', 'nombre']),
             'monedaBaseId' => $this->monedaBase()?->id,
+            'tasasVigentes' => Moneda::tasasVigentes(),
         ]);
     }
 
@@ -83,7 +84,7 @@ class OrdenCompraController extends Controller
 
         $detalles = $validated['detalles'];
         $montoTotal = $this->calcularMontoTotal($detalles);
-        $montoTotalBase = round($montoTotal * (float) $validated['tasa_cambio'], 2);
+        $montoTotalBase = round($montoTotal / (float) $validated['tasa_cambio'], 2);
 
         $orden = DB::transaction(function () use ($validated, $montoTotal, $montoTotalBase): OrdenCompra {
             $orden = OrdenCompra::create([
@@ -118,7 +119,7 @@ class OrdenCompraController extends Controller
 
         $detalles = $validated['detalles'];
         $montoTotal = $this->calcularMontoTotal($detalles);
-        $montoTotalBase = round($montoTotal * (float) $validated['tasa_cambio'], 2);
+        $montoTotalBase = round($montoTotal / (float) $validated['tasa_cambio'], 2);
 
         DB::transaction(function () use ($ordenCompra, $validated, $montoTotal, $montoTotalBase): void {
             $ordenCompra->update([
@@ -147,15 +148,11 @@ class OrdenCompraController extends Controller
 
     public function destroy(OrdenCompra $ordenCompra): JsonResponse
     {
-        $ordenCompra->loadCount('pagos');
-
-        if ($ordenCompra->pagos_count > 0) {
-            return response()->json([
-                'message' => 'No se puede eliminar la orden porque tiene pagos registrados.',
-            ], 422);
-        }
-
-        $ordenCompra->delete();
+        DB::transaction(function () use ($ordenCompra): void {
+            $ordenCompra->pagos()->delete();
+            $ordenCompra->detalles()->delete();
+            $ordenCompra->delete();
+        });
 
         return response()->json(['message' => "Orden de compra #{$ordenCompra->id} eliminada correctamente."]);
     }

@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Existencia;
 use App\Models\Moneda;
 use App\Models\Producto;
+use App\Models\TasaCambio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
@@ -81,6 +82,21 @@ class ProductoControllerTest extends TestCase
             ->assertJsonFragment(['sku' => $producto->sku]);
     }
 
+    public function test_el_listado_muestra_el_precio_en_dolares_y_bolivares(): void
+    {
+        $dolar = Moneda::factory()->create(['codigo' => 'USD', 'simbolo' => '$', 'es_moneda_base' => true]);
+        $bolivar = Moneda::factory()->create(['codigo' => 'VES', 'simbolo' => 'Bs.', 'es_moneda_base' => false]);
+        TasaCambio::factory()->create(['moneda_id' => $bolivar->id, 'tasa' => 950]);
+
+        Producto::factory()->create(['moneda_id' => $dolar->id, 'precio_venta' => 10]);
+
+        $this->actingAs($this->adminUser())
+            ->get('/productos/datos?draw=1')
+            ->assertOk()
+            ->assertJsonFragment(['precio_venta' => '$ 10,00'])
+            ->assertJsonFragment(['precio_venta_bolivares' => 'Bs. 9.500,00']);
+    }
+
     public function test_valid_payload_creates_product(): void
     {
         $categoria = Categoria::factory()->create();
@@ -101,7 +117,8 @@ class ProductoControllerTest extends TestCase
                 'unidad_medida' => 'PZA',
             ], ['Accept' => 'application/json'])
             ->assertOk()
-            ->assertJson(['message' => 'Producto Harina de Maíz creado correctamente.']);
+            ->assertJson(['message' => 'Producto Harina de Maíz creado correctamente.'])
+            ->assertJsonStructure(['message', 'producto_id']);
 
         $this->assertDatabaseHas('productos', [
             'sku' => 'PRD-001',

@@ -21,7 +21,7 @@ class ProductoFactory extends Factory
     {
         return [
             'categoria_id' => Categoria::factory(),
-            'moneda_id' => Moneda::factory(),
+            'moneda_id' => Moneda::where('codigo', 'USD')->value('id') ?? Moneda::factory(),
             'sku' => fake()->unique()->bothify('SKU-#####'),
             'codigo_barras' => fake()->unique()->numerify('750#############'),
             'nombre' => fake()->words(3, true),

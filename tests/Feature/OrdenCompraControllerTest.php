@@ -119,7 +119,7 @@ class OrdenCompraControllerTest extends TestCase
             'moneda_id' => $payload['moneda_id'],
             'tasa_cambio' => '40.5000',
             'monto_total' => '81.00',
-            'monto_total_base' => '3280.50',
+            'monto_total_base' => '2.00',
             'estado' => 'PENDIENTE',
             'estado_pago' => 'PENDIENTE',
         ]);
@@ -170,23 +170,27 @@ class OrdenCompraControllerTest extends TestCase
         $this->assertDatabaseHas('ordenes_compra', [
             'id' => $orden->id,
             'monto_total' => '81.00',
-            'monto_total_base' => '3280.50',
+            'monto_total_base' => '2.00',
         ]);
 
         $this->assertDatabaseMissing('detalles_orden_compra', ['id' => $detalle->id]);
         $this->assertDatabaseCount('detalles_orden_compra', 2);
     }
 
-    public function test_orden_with_pagos_cannot_be_deleted(): void
+    public function test_orden_with_pagos_is_deleted_with_its_pagos_and_detalles(): void
     {
         $orden = OrdenCompra::factory()->create();
-        PagoOrdenCompra::factory()->create(['orden_compra_id' => $orden->id]);
+        DetalleOrdenCompra::factory()->create(['orden_compra_id' => $orden->id]);
+        $pago = PagoOrdenCompra::factory()->create(['orden_compra_id' => $orden->id]);
 
         $this->actingAs($this->adminUser())
             ->delete("/compras/{$orden->id}", headers: ['Accept' => 'application/json'])
-            ->assertUnprocessable();
+            ->assertOk()
+            ->assertJson(['message' => "Orden de compra #{$orden->id} eliminada correctamente."]);
 
-        $this->assertDatabaseHas('ordenes_compra', ['id' => $orden->id]);
+        $this->assertDatabaseMissing('ordenes_compra', ['id' => $orden->id]);
+        $this->assertDatabaseMissing('pagos_orden_compra', ['id' => $pago->id]);
+        $this->assertDatabaseCount('detalles_orden_compra', 0);
     }
 
     public function test_empty_orden_is_deleted_with_its_detalles(): void

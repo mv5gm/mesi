@@ -10,19 +10,32 @@ class TasaCambioSeeder extends Seeder
 {
     /**
      * Seed conversion rates for non-base monedas.
+     *
+     * La tasa indica cuántas unidades de la moneda equivalen a 1 dólar.
      */
     public function run(): void
     {
         $tasas = [
-            'USD' => 36.0000,
-            'EUR' => 39.5000,
-            'COP' => 0.0093,
+            'VES' => 950.0000,
+            'EUR' => 0.9200,
+            'COP' => 3800.0000,
         ];
 
         foreach ($tasas as $codigo => $tasa) {
             $moneda = Moneda::where('codigo', $codigo)->first();
 
             if ($moneda === null) {
+                continue;
+            }
+
+            $tasaCambio = TasaCambio::query()
+                ->where('moneda_id', $moneda->id)
+                ->orderByDesc('fecha_efectiva')
+                ->first();
+
+            if ($tasaCambio !== null) {
+                $tasaCambio->update(['tasa' => $tasa]);
+
                 continue;
             }
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\MetodoPago;
+use App\Models\Moneda;
 use App\Models\PagoOrdenCompra;
 use App\Models\PagoOrdenVenta;
 use App\Models\User;
@@ -41,6 +42,11 @@ class MetodoPagoControllerTest extends TestCase
     private function basicUser(): User
     {
         return tap(User::factory()->create(), fn (User $user) => $user->assignRole($this->basicRole));
+    }
+
+    private function monedaId(): int
+    {
+        return Moneda::factory()->create()->id;
     }
 
     public function test_unauthenticated_request_redirects_to_login(): void
@@ -82,10 +88,13 @@ class MetodoPagoControllerTest extends TestCase
 
     public function test_valid_payload_creates_metodo(): void
     {
+        $monedaId = $this->monedaId();
+
         $this->actingAs($this->adminUser())
             ->post('/metodos-pago', [
                 'nombre' => 'Zelle',
                 'requiere_referencia' => '1',
+                'moneda_id' => $monedaId,
             ], ['Accept' => 'application/json'])
             ->assertOk()
             ->assertJson(['message' => 'Método de pago Zelle creado correctamente.']);
@@ -93,6 +102,7 @@ class MetodoPagoControllerTest extends TestCase
         $this->assertDatabaseHas('metodos_pago', [
             'nombre' => 'Zelle',
             'requiere_referencia' => true,
+            'moneda_id' => $monedaId,
         ]);
     }
 
@@ -101,6 +111,7 @@ class MetodoPagoControllerTest extends TestCase
         $this->actingAs($this->adminUser())
             ->post('/metodos-pago', [
                 'nombre' => 'Efectivo',
+                'moneda_id' => $this->monedaId(),
             ], ['Accept' => 'application/json'])
             ->assertOk();
 
@@ -115,7 +126,20 @@ class MetodoPagoControllerTest extends TestCase
         $this->actingAs($this->adminUser())
             ->post('/metodos-pago', [], ['Accept' => 'application/json'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('nombre');
+            ->assertJsonValidationErrors(['nombre', 'moneda_id']);
+
+        $this->assertDatabaseCount('metodos_pago', 0);
+    }
+
+    public function test_invalid_moneda_is_rejected(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post('/metodos-pago', [
+                'nombre' => 'PayPal',
+                'moneda_id' => 9999,
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('moneda_id');
 
         $this->assertDatabaseCount('metodos_pago', 0);
     }
@@ -127,6 +151,7 @@ class MetodoPagoControllerTest extends TestCase
         $this->actingAs($this->adminUser())
             ->post('/metodos-pago', [
                 'nombre' => 'Transferencia',
+                'moneda_id' => $this->monedaId(),
             ], ['Accept' => 'application/json'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('nombre');
@@ -137,17 +162,20 @@ class MetodoPagoControllerTest extends TestCase
     public function test_valid_payload_updates_metodo(): void
     {
         $metodo = MetodoPago::factory()->create(['nombre' => 'Efectivo']);
+        $monedaId = $this->monedaId();
 
         $this->actingAs($this->adminUser())
             ->put("/metodos-pago/{$metodo->id}", [
                 'nombre' => 'Efectivo USD',
                 'requiere_referencia' => '0',
+                'moneda_id' => $monedaId,
             ], ['Accept' => 'application/json'])
             ->assertOk()
             ->assertJson(['message' => 'Método de pago Efectivo USD actualizado correctamente.']);
 
         $this->assertSame('Efectivo USD', $metodo->fresh()->nombre);
         $this->assertFalse($metodo->fresh()->requiere_referencia);
+        $this->assertSame($monedaId, $metodo->fresh()->moneda_id);
     }
 
     public function test_update_with_same_nombre_is_allowed(): void
@@ -157,6 +185,7 @@ class MetodoPagoControllerTest extends TestCase
         $this->actingAs($this->adminUser())
             ->put("/metodos-pago/{$metodo->id}", [
                 'nombre' => 'Pago Móvil',
+                'moneda_id' => $this->monedaId(),
             ], ['Accept' => 'application/json'])
             ->assertOk();
 

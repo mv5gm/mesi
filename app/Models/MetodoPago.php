@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MetodoPago extends Model
@@ -17,11 +18,17 @@ class MetodoPago extends Model
     protected $fillable = [
         'nombre',
         'requiere_referencia',
+        'moneda_id',
     ];
 
     protected $casts = [
         'requiere_referencia' => 'boolean',
     ];
+
+    public function moneda(): BelongsTo
+    {
+        return $this->belongsTo(Moneda::class, 'moneda_id');
+    }
 
     public function pagosOrdenCompra(): HasMany
     {

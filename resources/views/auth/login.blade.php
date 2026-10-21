@@ -2,8 +2,14 @@
     <div class="flex min-h-screen items-center justify-center px-4">
         <div class="w-full max-w-md">
             <div class="rounded-2xl bg-white p-8 shadow-lg">
-                <h1 class="text-center text-2xl font-bold">Mesi</h1>
-                <p class="mt-1 text-center text-sm text-gray-500">Inicia sesión con tu usuario</p>
+                <div class="flex justify-center">
+                    <img
+                        src="{{ asset('img/mesi-logo.png') }}"
+                        alt="Mesi - Motor & Engine Spare Inventory"
+                        class="w-full max-w-sm"
+                    >
+                </div>
+                <p class="mt-4 text-center text-sm text-gray-500">Inicia sesión con tu usuario</p>
 
                 @if ($errors->any())
                     <div class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">

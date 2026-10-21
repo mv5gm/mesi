@@ -34,6 +34,17 @@ class RoleSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions($permissions);
 
-        Role::firstOrCreate(['name' => 'usuario']);
+        $usuarioPermissions = [
+            'gestionar productos',
+            'gestionar existencias',
+            'gestionar proveedores',
+            'gestionar compras',
+            'gestionar tasas cambio',
+            'gestionar clientes',
+            'gestionar ventas',
+        ];
+
+        $usuario = Role::firstOrCreate(['name' => 'usuario']);
+        $usuario->syncPermissions($usuarioPermissions);
     }
 }

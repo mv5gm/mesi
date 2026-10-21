@@ -87,6 +87,34 @@ class ExistenciaControllerTest extends TestCase
             ->assertJsonFragment(['almacen' => 'Almacén Central']);
     }
 
+    public function test_productos_endpoint_devuelve_productos_coincidentes_en_nombre_y_sku(): void
+    {
+        $porNombre = Producto::factory()->create(['sku' => 'ZZZ-9', 'nombre' => 'Filtro de aceite']);
+        Producto::factory()->create(['sku' => 'ABC-1', 'nombre' => 'Aceite de motor']);
+        Producto::factory()->create(['sku' => 'FILTRO-2', 'nombre' => 'Cualquier cosa']);
+
+        $this->actingAs($this->adminUser())
+            ->get('/existencias/productos?q=FILTRO')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $porNombre->id, 'text' => 'ZZZ-9 — Filtro de aceite']);
+    }
+
+    public function test_productos_endpoint_limita_los_resultados(): void
+    {
+        Producto::factory()->count(25)->create();
+
+        $this->actingAs($this->adminUser())
+            ->get('/existencias/productos')
+            ->assertOk()
+            ->assertJsonCount(20);
+    }
+
+    public function test_productos_endpoint_requiere_autenticacion(): void
+    {
+        $this->get('/existencias/productos?q=test')
+            ->assertRedirect('/login');
+    }
+
     public function test_valid_payload_creates_existencia(): void
     {
         $producto = Producto::factory()->create();
@@ -116,6 +144,32 @@ class ExistenciaControllerTest extends TestCase
             ->assertJsonValidationErrors(['producto_id', 'almacen_id', 'cantidad']);
 
         $this->assertDatabaseCount('existencias', 0);
+    }
+
+    public function test_un_registro_sin_almacen_es_rechazado_con_mensaje(): void
+    {
+        $producto = Producto::factory()->create();
+
+        $this->actingAs($this->adminUser())
+            ->post('/existencias', [
+                'producto_id' => $producto->id,
+                'cantidad' => 5,
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['almacen_id' => ['Debes seleccionar un almacén.']]);
+
+        $this->assertDatabaseCount('existencias', 0);
+    }
+
+    public function test_el_formulario_tiene_los_contenedores_de_errores(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->get('/existencias')
+            ->assertOk()
+            ->assertSee('id="register-form"', false)
+            ->assertSee('id="register-errors"', false)
+            ->assertSee('id="edit-form"', false)
+            ->assertSee('id="edit-errors"', false);
     }
 
     public function test_negative_cantidad_is_rejected(): void

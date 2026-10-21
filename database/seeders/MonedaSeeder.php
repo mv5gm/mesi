@@ -13,9 +13,9 @@ class MonedaSeeder extends Seeder
     public function run(): void
     {
         $monedas = [
-            ['codigo' => 'USD', 'nombre' => 'Dólar Estadounidense', 'simbolo' => '$', 'es_moneda_base' => false],
+            ['codigo' => 'USD', 'nombre' => 'Dólar Estadounidense', 'simbolo' => '$', 'es_moneda_base' => true],
             ['codigo' => 'EUR', 'nombre' => 'Euro', 'simbolo' => '€', 'es_moneda_base' => false],
-            ['codigo' => 'VES', 'nombre' => 'Bolívar', 'simbolo' => 'Bs.', 'es_moneda_base' => true],
+            ['codigo' => 'VES', 'nombre' => 'Bolívar', 'simbolo' => 'Bs.', 'es_moneda_base' => false],
             ['codigo' => 'COP', 'nombre' => 'Peso Colombiano', 'simbolo' => 'COL $', 'es_moneda_base' => false],
         ];
 

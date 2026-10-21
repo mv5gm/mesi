@@ -119,12 +119,13 @@ class MonedaController extends Controller
 
     public function destroy(Moneda $moneda): JsonResponse
     {
-        $moneda->loadCount('tasasCambio', 'productos', 'ordenesCompra', 'ordenesVenta');
+        $moneda->loadCount('tasasCambio', 'productos', 'ordenesCompra', 'ordenesVenta', 'metodosPago');
 
         if ($moneda->tasas_cambio_count > 0 || $moneda->productos_count > 0
-            || $moneda->ordenes_compra_count > 0 || $moneda->ordenes_venta_count > 0) {
+            || $moneda->ordenes_compra_count > 0 || $moneda->ordenes_venta_count > 0
+            || $moneda->metodos_pago_count > 0) {
             return response()->json([
-                'message' => 'No se puede eliminar la moneda porque tiene tasas de cambio, productos u órdenes asociadas.',
+                'message' => 'No se puede eliminar la moneda porque tiene tasas de cambio, productos, órdenes o métodos de pago asociados.',
             ], 422);
         }
 

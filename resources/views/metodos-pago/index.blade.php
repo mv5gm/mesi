@@ -21,6 +21,7 @@
             <thead>
                 <tr>
                     <th>Nombre</th>
+                    <th>Moneda</th>
                     <th>Requiere referencia</th>
                     <th>Acciones</th>
                 </tr>
@@ -61,6 +62,17 @@
                         autocomplete="off"
                         class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
+                </div>
+
+                <div>
+                    <label for="register-moneda-id" class="block text-sm font-medium">Moneda</label>
+                    <select
+                        id="register-moneda-id"
+                        name="moneda_id"
+                        required
+                        class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    ></select>
+                    <p class="mt-1 text-xs text-gray-500">Moneda en la que se liquida este método de pago.</p>
                 </div>
 
                 <label class="flex items-center gap-2 pt-1">
@@ -112,6 +124,17 @@
                 <div>
                     <label for="edit-nombre" class="block text-sm font-medium">Nombre</label>
                     <input id="edit-nombre" type="text" name="nombre" required maxlength="50" autocomplete="off" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label for="edit-moneda-id" class="block text-sm font-medium">Moneda</label>
+                    <select
+                        id="edit-moneda-id"
+                        name="moneda_id"
+                        required
+                        class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    ></select>
+                    <p class="mt-1 text-xs text-gray-500">Moneda en la que se liquida este método de pago.</p>
                 </div>
 
                 <label class="flex items-center gap-2 pt-1">
@@ -221,6 +244,8 @@
         <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
+        const monedaOptions = @json($listaMonedas->mapWithKeys(fn ($moneda) => [$moneda->id => "{$moneda->codigo} — {$moneda->nombre}"]));
+
         function toast(message) {
             const el = document.getElementById('toast');
             el.textContent = message;
@@ -268,8 +293,29 @@
             renderErrors(containerId, null);
         }
 
+        function buildOptions(selectEl, options, selectedValue, placeholder) {
+            selectEl.innerHTML = '';
+
+            if (placeholder) {
+                const placeholderOption = document.createElement('option');
+                placeholderOption.value = '';
+                placeholderOption.textContent = placeholder;
+                selectEl.appendChild(placeholderOption);
+            }
+
+            Object.entries(options).forEach(([id, label]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = label;
+                selectEl.appendChild(option);
+            });
+
+            selectEl.value = selectedValue || '';
+        }
+
         window.openRegisterModal = function () {
             document.getElementById('register-form').reset();
+            buildOptions(document.getElementById('register-moneda-id'), monedaOptions, '', 'Selecciona una moneda');
             clearErrors('register-errors');
             openModal('register-modal');
         };
@@ -278,6 +324,7 @@
             const form = document.getElementById('edit-form');
             form.elements['nombre'].value = button.dataset.nombre;
             form.elements['requiere_referencia'].checked = button.dataset.requiereReferencia === '1';
+            buildOptions(form.elements['moneda_id'], monedaOptions, button.dataset.moneda, 'Selecciona una moneda');
             form.action = '/metodos-pago/' + button.dataset.id;
             clearErrors('edit-errors');
             openModal('edit-modal');
@@ -301,6 +348,7 @@
                 },
                 columns: [
                     { data: 'nombre' },
+                    { data: 'moneda', orderable: false },
                     { data: 'requiere_referencia', orderable: false },
                     { data: 'actions', orderable: false, searchable: false },
                 ],

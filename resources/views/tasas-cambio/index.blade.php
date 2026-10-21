@@ -62,7 +62,7 @@
                 </div>
 
                 <div>
-                    <label for="register-tasa" class="block text-sm font-medium">Tasa (1 moneda = N base)</label>
+                    <label for="register-tasa" class="block text-sm font-medium">Tasa (1 base = N moneda)</label>
                     <input
                         id="register-tasa"
                         type="number"
@@ -132,7 +132,7 @@
                 </div>
 
                 <div>
-                    <label for="edit-tasa" class="block text-sm font-medium">Tasa (1 moneda = N base)</label>
+                    <label for="edit-tasa" class="block text-sm font-medium">Tasa (1 base = N moneda)</label>
                     <input
                         id="edit-tasa"
                         type="number"

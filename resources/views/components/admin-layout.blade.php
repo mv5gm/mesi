@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Mesi' }}</title>
+    <link rel="icon" type="image/png" sizes="64x64" href="{{ asset('img/favicon-64.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('img/apple-touch-icon.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @php
         $configOpen = request()->routeIs('categorias.*', 'monedas.*', 'almacenes.*', 'metodos-pago.*');
@@ -12,8 +14,12 @@
 </head>
 <body class="min-h-screen bg-gray-100 font-sans antialiased text-gray-900">
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-gray-900 text-gray-100 transition-transform duration-200 md:translate-x-0">
-        <div class="flex h-16 items-center justify-between px-6">
-            <span class="text-lg font-bold">Mesi</span>
+        <div class="flex h-16 items-center justify-between gap-3 px-6">
+            <img
+                src="{{ asset('img/mesi-logo-sidebar.png') }}"
+                alt="Mesi"
+                class="h-9 w-auto object-contain"
+            >
             <button
                 type="button"
                 onclick="toggleSidebar()"

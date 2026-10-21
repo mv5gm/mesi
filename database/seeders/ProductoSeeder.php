@@ -14,7 +14,7 @@ class ProductoSeeder extends Seeder
      */
     public function run(): void
     {
-        $monedaReferencia = Moneda::where('es_moneda_base', true)->first() ?? Moneda::first();
+        $monedaReferencia = Moneda::where('codigo', 'USD')->first() ?? Moneda::where('es_moneda_base', true)->first() ?? Moneda::first();
 
         if ($monedaReferencia === null) {
             return;

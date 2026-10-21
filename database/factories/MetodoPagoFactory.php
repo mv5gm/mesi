@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\MetodoPago;
+use App\Models\Moneda;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,6 +21,7 @@ class MetodoPagoFactory extends Factory
         return [
             'nombre' => fake()->randomElement(['Efectivo', 'Transferencia', 'Punto de Venta', 'Zelle', 'Pago Móvil']),
             'requiere_referencia' => fake()->boolean(),
+            'moneda_id' => Moneda::factory(),
         ];
     }
 }

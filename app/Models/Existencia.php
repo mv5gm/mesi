@@ -32,4 +32,63 @@ class Existencia extends Model
     {
         return $this->belongsTo(Almacen::class, 'almacen_id');
     }
+
+    /**
+     * Descuenta unidades de las existencias del producto, tomado de los almacenes con stock.
+     *
+     * @return array<int, array{almacen_id: int, cantidad: int}>
+     */
+    public static function descontar(int $productoId, int $cantidad): array
+    {
+        $movimientos = [];
+        $restante = $cantidad;
+
+        $existencias = static::query()
+            ->where('producto_id', $productoId)
+            ->where('cantidad', '>', 0)
+            ->orderBy('almacen_id')
+            ->get();
+
+        foreach ($existencias as $existencia) {
+            if ($restante <= 0) {
+                break;
+            }
+
+            $tomado = min($existencia->cantidad, $restante);
+
+            $existencia->update(['cantidad' => $existencia->cantidad - $tomado]);
+
+            $movimientos[] = ['almacen_id' => $existencia->almacen_id, 'cantidad' => $tomado];
+            $restante -= $tomado;
+        }
+
+        return $movimientos;
+    }
+
+    /**
+     * Devuelve unidades a las existencias del producto en el almacén indicado.
+     */
+    public static function devolver(int $productoId, int $almacenId, int $cantidad): void
+    {
+        if ($cantidad <= 0) {
+            return;
+        }
+
+        $existencia = static::query()
+            ->where('producto_id', $productoId)
+            ->where('almacen_id', $almacenId)
+            ->first();
+
+        if ($existencia === null) {
+            static::create([
+                'producto_id' => $productoId,
+                'almacen_id' => $almacenId,
+                'cantidad' => $cantidad,
+            ]);
+
+            return;
+        }
+
+        $existencia->update(['cantidad' => $existencia->cantidad + $cantidad]);
+    }
 }
