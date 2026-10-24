@@ -57,6 +57,18 @@ class DashboardController extends Controller
 
         $unidades = (int) DB::table('existencias')->sum('cantidad');
 
+        $pagosPorMetodo = DB::table('pagos_orden_venta')
+            ->join('ordenes_venta', 'ordenes_venta.id', '=', 'pagos_orden_venta.orden_venta_id')
+            ->join('metodos_pago', 'metodos_pago.id', '=', 'pagos_orden_venta.metodo_pago_id')
+            ->join('monedas', 'monedas.id', '=', 'metodos_pago.moneda_id')
+            ->where('ordenes_venta.estado', '!=', EstadoOrdenVenta::Cancelada->value)
+            ->groupBy('metodos_pago.id', 'metodos_pago.nombre', 'monedas.simbolo', 'monedas.codigo')
+            ->selectRaw('metodos_pago.nombre, monedas.simbolo, monedas.codigo, SUM(pagos_orden_venta.monto) as monto, SUM(pagos_orden_venta.monto_base) as monto_base')
+            ->orderByDesc('monto_base')
+            ->get();
+
+        $totalCobradoBase = (float) $pagosPorMetodo->sum('monto_base');
+
         return view('dashboard', [
             'monedaBase' => $monedaBase,
             'invertido' => $invertido,
@@ -66,6 +78,8 @@ class DashboardController extends Controller
             'totalProductos' => Producto::count(),
             'totalOrdenes' => OrdenVenta::where('estado', '!=', EstadoOrdenVenta::Cancelada->value)->count(),
             'totalClientes' => Cliente::count(),
+            'pagosPorMetodo' => $pagosPorMetodo,
+            'totalCobradoBase' => $totalCobradoBase,
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrdenCompra;
 use App\Models\Proveedor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +77,27 @@ class ProveedorController extends Controller
         ]);
     }
 
+    public function proveedoresSelect2(Request $request): JsonResponse
+    {
+        $busqueda = $request->string('q')->toString();
+
+        $proveedores = Proveedor::query()
+            ->orderBy('nombre_empresa')
+            ->limit(20);
+
+        if ($busqueda !== '') {
+            $proveedores->where('nombre_empresa', 'like', "%{$busqueda}%");
+        }
+
+        $resultados = $proveedores->get()->map(fn (Proveedor $proveedor): array => [
+            'id' => $proveedor->id,
+            'text' => $proveedor->nombre_empresa,
+            'moneda_id' => OrdenCompra::where('proveedor_id', $proveedor->id)->orderByDesc('id')->value('moneda_id'),
+        ]);
+
+        return response()->json($resultados->values());
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -95,7 +117,11 @@ class ProveedorController extends Controller
 
         $proveedor = Proveedor::create($validated);
 
-        return response()->json(['message' => "Proveedor {$proveedor->nombre_empresa} creado correctamente."]);
+        return response()->json([
+            'message' => "Proveedor {$proveedor->nombre_empresa} creado correctamente.",
+            'proveedor_id' => $proveedor->id,
+            'nombre_empresa' => $proveedor->nombre_empresa,
+        ]);
     }
 
     public function update(Request $request, Proveedor $proveedor): JsonResponse

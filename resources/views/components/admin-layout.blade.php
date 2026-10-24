@@ -18,7 +18,7 @@
             <img
                 src="{{ asset('img/mesi-logo-sidebar.png') }}"
                 alt="Mesi"
-                class="h-9 w-auto object-contain"
+                class="h-12 w-auto object-contain"
             >
             <button
                 type="button"

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\EstadoOrdenCompra;
 use App\Enums\EstadoPago;
+use App\Models\Existencia;
 use App\Models\Moneda;
 use App\Models\OrdenCompra;
 use App\Models\Producto;
@@ -107,6 +108,12 @@ class OrdenCompraController extends Controller
                 ])
             );
 
+            if ($validated['estado'] !== EstadoOrdenCompra::Cancelada->value) {
+                foreach ($validated['detalles'] as $detalle) {
+                    Existencia::sumar((int) $detalle['producto_id'], (int) $detalle['cantidad']);
+                }
+            }
+
             return $orden;
         });
 
@@ -122,6 +129,15 @@ class OrdenCompraController extends Controller
         $montoTotalBase = round($montoTotal / (float) $validated['tasa_cambio'], 2);
 
         DB::transaction(function () use ($ordenCompra, $validated, $montoTotal, $montoTotalBase): void {
+            $estadoAnterior = $ordenCompra->estado;
+            $detallesAnteriores = $ordenCompra->detalles->map(fn ($d) => ['producto_id' => $d->producto_id, 'cantidad' => $d->cantidad])->all();
+
+            if ($estadoAnterior !== EstadoOrdenCompra::Cancelada) {
+                foreach ($detallesAnteriores as $detalle) {
+                    Existencia::descontar((int) $detalle['producto_id'], (int) $detalle['cantidad']);
+                }
+            }
+
             $ordenCompra->update([
                 'proveedor_id' => $validated['proveedor_id'],
                 'moneda_id' => $validated['moneda_id'],
@@ -141,6 +157,12 @@ class OrdenCompraController extends Controller
                     'costo_unitario' => $detalle['costo_unitario'],
                 ])
             );
+
+            if ($validated['estado'] !== EstadoOrdenCompra::Cancelada->value) {
+                foreach ($validated['detalles'] as $detalle) {
+                    Existencia::sumar((int) $detalle['producto_id'], (int) $detalle['cantidad']);
+                }
+            }
         });
 
         return response()->json(['message' => "Orden de compra #{$ordenCompra->id} actualizada correctamente."]);
@@ -149,6 +171,12 @@ class OrdenCompraController extends Controller
     public function destroy(OrdenCompra $ordenCompra): JsonResponse
     {
         DB::transaction(function () use ($ordenCompra): void {
+            if ($ordenCompra->estado !== EstadoOrdenCompra::Cancelada) {
+                foreach ($ordenCompra->detalles as $detalle) {
+                    Existencia::descontar((int) $detalle->producto_id, (int) $detalle->cantidad);
+                }
+            }
+
             $ordenCompra->pagos()->delete();
             $ordenCompra->detalles()->delete();
             $ordenCompra->delete();

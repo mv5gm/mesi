@@ -79,6 +79,16 @@ class ProveedorControllerTest extends TestCase
             ->assertJsonFragment(['nombre_empresa' => 'Repuestos El Motor']);
     }
 
+    public function test_proveedores_select2_returns_filtered_proveedores(): void
+    {
+        Proveedor::factory()->create(['nombre_empresa' => 'Repuestos El Motor']);
+
+        $this->actingAs($this->adminUser())
+            ->get('/proveedores/select2?q=Repuestos')
+            ->assertOk()
+            ->assertJsonFragment(['text' => 'Repuestos El Motor']);
+    }
+
     public function test_valid_payload_creates_proveedor(): void
     {
         $this->actingAs($this->adminUser())

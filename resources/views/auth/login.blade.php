@@ -9,8 +9,6 @@
                         class="w-full max-w-sm"
                     >
                 </div>
-                <p class="mt-4 text-center text-sm text-gray-500">Inicia sesión con tu usuario</p>
-
                 @if ($errors->any())
                     <div class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                         <ul class="list-disc space-y-1 pl-4">
@@ -48,13 +46,6 @@
                             autocomplete="current-password"
                             class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         >
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center text-sm">
-                            <input type="checkbox" name="remember" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            <span class="ml-2">Recordarme</span>
-                        </label>
                     </div>
 
                     <button

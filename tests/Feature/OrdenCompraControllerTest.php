@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Almacen;
 use App\Models\DetalleOrdenCompra;
+use App\Models\Existencia;
 use App\Models\Moneda;
 use App\Models\OrdenCompra;
 use App\Models\PagoOrdenCompra;
@@ -125,6 +127,32 @@ class OrdenCompraControllerTest extends TestCase
         ]);
 
         $this->assertDatabaseCount('detalles_orden_compra', 2);
+    }
+
+    public function test_registrar_compra_suma_cantidades_a_existencias(): void
+    {
+        $almacen = Almacen::factory()->create();
+        $producto = Producto::factory()->create();
+        $existencia = Existencia::create([
+            'producto_id' => $producto->id,
+            'almacen_id' => $almacen->id,
+            'cantidad' => 4,
+        ]);
+
+        $payload = $this->payloadValidado();
+        $payload['detalles'] = [
+            ['producto_id' => $producto->id, 'cantidad' => 4, 'costo_unitario' => 10.5],
+        ];
+
+        $this->actingAs($this->adminUser())
+            ->post('/compras', $payload, ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('existencias', [
+            'producto_id' => $producto->id,
+            'almacen_id' => $almacen->id,
+            'cantidad' => 8,
+        ]);
     }
 
     public function test_empty_payload_is_rejected(): void

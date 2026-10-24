@@ -85,6 +85,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:gestionar proveedores')->group(function () {
         Route::get('/proveedores', [ProveedorController::class, 'index'])->name('proveedores.index');
         Route::get('/proveedores/datos', [ProveedorController::class, 'data'])->name('proveedores.data');
+        Route::get('/proveedores/select2', [ProveedorController::class, 'proveedoresSelect2'])->name('proveedores.select2');
         Route::post('/proveedores', [ProveedorController::class, 'store'])->name('proveedores.store');
         Route::put('/proveedores/{proveedor}', [ProveedorController::class, 'update'])->name('proveedores.update');
         Route::delete('/proveedores/{proveedor}', [ProveedorController::class, 'destroy'])->name('proveedores.destroy');

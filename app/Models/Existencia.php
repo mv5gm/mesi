@@ -91,4 +91,38 @@ class Existencia extends Model
 
         $existencia->update(['cantidad' => $existencia->cantidad + $cantidad]);
     }
+
+    /**
+     * Suma unidades a las existencias del producto, agregándolas al almacén con stock existente
+     * (o creando una nueva existencia en el primer almacén si no hay ninguna).
+     */
+    public static function sumar(int $productoId, int $cantidad): void
+    {
+        if ($cantidad <= 0) {
+            return;
+        }
+
+        $existencia = static::query()
+            ->where('producto_id', $productoId)
+            ->orderBy('almacen_id')
+            ->first();
+
+        if ($existencia === null) {
+            $almacenId = Almacen::query()->orderBy('id')->value('id');
+
+            if ($almacenId === null) {
+                return;
+            }
+
+            static::create([
+                'producto_id' => $productoId,
+                'almacen_id' => $almacenId,
+                'cantidad' => $cantidad,
+            ]);
+
+            return;
+        }
+
+        $existencia->update(['cantidad' => $existencia->cantidad + $cantidad]);
+    }
 }

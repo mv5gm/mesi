@@ -57,25 +57,27 @@
                 <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
                     <div id="register-errors" class="hidden rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"></div>
 
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                            <label for="register-proveedor-id" class="block text-sm font-medium">Proveedor</label>
+                    <div class="flex flex-col gap-2">
+                        <label for="register-proveedor-id" class="block text-sm font-medium">Proveedor</label>
+                        <div class="flex gap-2">
                             <select
                                 id="register-proveedor-id"
                                 name="proveedor_id"
                                 required
-                                class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                class="flex-1"
                             ></select>
+                            <button
+                                type="button"
+                                onclick="openNuevoProveedorModal()"
+                                class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
+                                title="Agregar proveedor nuevo"
+                            >
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                            </button>
                         </div>
-                        <div>
-                            <label for="register-moneda-id" class="block text-sm font-medium">Moneda</label>
-                            <select
-                                id="register-moneda-id"
-                                name="moneda_id"
-                                required
-                                class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            ></select>
-                        </div>
+                        <input type="hidden" name="moneda_id" id="register-moneda-id" value="{{ $monedaBaseId }}">
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -333,6 +335,60 @@
         </div>
     </div>
 
+    {{-- Modal nuevo proveedor rápido --}}
+    <div id="nuevo-proveedor-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50" onclick="closeModal('nuevo-proveedor-modal')"></div>
+        <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div class="bg-gray-100 px-4 py-3 flex items-center justify-between">
+                <h3 class="text-sm font-semibold">Nuevo proveedor</h3>
+                <button type="button" onclick="closeModal('nuevo-proveedor-modal')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="nuevo-proveedor-form" class="p-4 space-y-3">
+                <div id="nuevo-proveedor-errors" class="hidden rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700"></div>
+                <div>
+                    <label for="nuevo-proveedor-nombre_empresa" class="block text-sm font-medium">Empresa</label>
+                    <input
+                        id="nuevo-proveedor-nombre_empresa"
+                        type="text"
+                        name="nombre_empresa"
+                        required
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                </div>
+                <div>
+                    <label for="nuevo-proveedor-nombre_contacto" class="block text-sm font-medium">Nombre de contacto</label>
+                    <input
+                        id="nuevo-proveedor-nombre_contacto"
+                        type="text"
+                        name="nombre_contacto"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                </div>
+                <div>
+                    <label for="nuevo-proveedor-correo" class="block text-sm font-medium">Correo</label>
+                    <input
+                        id="nuevo-proveedor-correo"
+                        type="email"
+                        name="correo"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('nuevo-proveedor-modal')" class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="guardarNuevoProveedor()" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-500">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="toast" class="pointer-events-none fixed bottom-6 right-6 z-[60] hidden rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white shadow-lg"></div>
 
     @push('scripts')
@@ -398,8 +454,40 @@
             background: #fff;
             outline: none;
         }
+        .select2-container .select2-selection--single {
+            height: 2.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            background: #fff;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 2.5rem;
+            padding-left: 0.75rem;
+            color: #111827;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            top: 8px;
+            color: #6b7280;
+        }
+        .select2-container--default .select2-dropdown {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .select2-container--default .select2-search--dropdown .select2-search__field {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            width: 100%;
+        }
+        .select2-container--default .select2-results__option--highlighted[aria-selected] {
+            background: #eef2ff;
+            color: #111827;
+        }
     </style>
         <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/i18n/es.js"></script>
         <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
         <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
@@ -492,6 +580,28 @@
             return parseFloat(valor || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function initSelect2Ajax(selectId, url, placeholder) {
+            return $(selectId).select2({
+                placeholder: placeholder,
+                allowClear: true,
+                language: 'es',
+                minimumInputLength: 0,
+                width: '100%',
+                ajax: {
+                    url: url,
+                    dataType: 'json',
+                    delay: 250,
+                    cache: true,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (data) {
+                        return { results: data };
+                    },
+                },
+            });
+        }
+
         function lineaHTML(productoId, cantidad, unitario, bodyId) {
             return `
                 <tr>
@@ -578,12 +688,60 @@
             });
         }
 
+        window.openNuevoProveedorModal = function () {
+            document.getElementById('nuevo-proveedor-form').reset();
+            const errors = document.getElementById('nuevo-proveedor-errors');
+            if (errors) errors.classList.add('hidden');
+            openModal('nuevo-proveedor-modal');
+        };
+
+        async function guardarNuevoProveedor() {
+            const form = document.getElementById('nuevo-proveedor-form');
+            const formData = new FormData(form);
+            const errorsContainer = document.getElementById('nuevo-proveedor-errors');
+            errorsContainer.innerHTML = '';
+            errorsContainer.classList.add('hidden');
+
+            try {
+                const response = await fetch('{{ route('proveedores.store') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (data.errors) {
+                        const items = Object.values(data.errors).flat().map((msg) => '<li>' + msg + '</li>').join('');
+                        errorsContainer.innerHTML = '<ul class="list-disc space-y-1 pl-4 text-red-600 text-xs">' + items + '</ul>';
+                        errorsContainer.classList.remove('hidden');
+                    }
+                    return;
+                }
+
+                closeModal('nuevo-proveedor-modal');
+                toast(data.message);
+
+                const select = document.getElementById('register-proveedor-id');
+                const option = new Option(data.nombre_empresa, String(data.proveedor_id), false, true);
+                select.add(option);
+                $(select).val(data.proveedor_id).trigger('change');
+            } catch (e) {
+                toast('Error al crear el proveedor.');
+            }
+        };
+
         window.openRegisterModal = function () {
             document.getElementById('register-form').reset();
             const body = document.getElementById('register-detalles-body');
             body.innerHTML = '';
-            buildOptions(document.getElementById('register-proveedor-id'), proveedorOptions, '', 'Selecciona un proveedor');
-            buildOptions(document.getElementById('register-moneda-id'), monedaOptions, monedaBaseId, 'Selecciona una moneda');
+            $('#register-proveedor-id').val(null).trigger('change');
+            document.getElementById('register-moneda-id').value = @json($monedaBaseId);
             document.getElementById('register-fecha-orden').value = new Date().toISOString().slice(0, 16);
             document.getElementById('register-tasa-cambio').value = tasasVigentes[monedaBaseId] ?? 1;
             document.getElementById('register-estado').value = 'PENDIENTE';
@@ -702,6 +860,24 @@
             }
         };
 
+        const proveedorSelect = initSelect2Ajax('#register-proveedor-id', '{{ route('proveedores.select2') }}', 'Busca un proveedor…');
+
+        proveedorSelect
+            .on('select2:select', async function (e) {
+                const proveedor = e.params.data;
+
+                document.getElementById('register-moneda-id').value = proveedor.moneda_id ?? @json($monedaBaseId);
+                document.getElementById('register-tasa-cambio').value = tasasVigentes[proveedor.moneda_id] ?? 1;
+
+                recomputarTotales('register-detalles-body');
+            })
+            .on('select2:clear', function () {
+                document.getElementById('register-moneda-id').value = @json($monedaBaseId);
+                document.getElementById('register-tasa-cambio').value = tasasVigentes[monedaBaseId] ?? 1;
+
+                recomputarTotales('register-detalles-body');
+            });
+
         configurarRecalculo();
 
         dataTable = $('#compras-table').DataTable({
@@ -724,7 +900,28 @@
             ],
             order: [[0, 'desc']],
             language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json',
+                processing: 'Procesando...',
+                search: 'Buscar:',
+                lengthMenu: 'Mostrar _MENU_ registros',
+                info: 'Mostrando registros del _START_ al _END_ de un total de _TOTAL_ registros',
+                infoEmpty: 'Mostrando registros del 0 al 0 de un total de 0 registros',
+                infoFiltered: '(filtrado de un total de _MAX_ registros)',
+                infoPostFix: '',
+                loadingRecords: 'Cargando registros...',
+                zeroRecords: 'No se encontraron registros',
+                emptyTable: 'No hay datos disponibles en la tabla',
+                decimal: ',',
+                thousands: '.',
+                paginate: {
+                    first: 'Primero',
+                    previous: 'Anterior',
+                    next: 'Siguiente',
+                    last: 'Último',
+                },
+                aria: {
+                    sortAscending: ': Activar para ordenar la columna de manera ascendente',
+                    sortDescending: ': Activar para ordenar la columna de manera descendente',
+                },
             },
         });
         </script>

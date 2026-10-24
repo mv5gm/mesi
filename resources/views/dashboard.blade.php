@@ -8,6 +8,7 @@
         $altoGanancias = $altura($ganancias);
         $altoVentas = $altura($ventas);
         $margen = $ventas > 0 ? ($ganancias / $ventas) * 100 : 0.0;
+        $colores = ['bg-indigo-500', 'bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500', 'bg-rose-500'];
     @endphp
 
     <div class="flex flex-wrap items-end justify-between gap-4">
@@ -144,6 +145,57 @@
                 </ul>
             </div>
         </div>
+    </div>
+
+    <div class="mt-6 rounded-2xl bg-white p-6 shadow">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Ventas por método de pago</h2>
+            <span class="text-xs text-gray-500">
+                Total cobrado:
+                <strong class="text-gray-900">{{ $simbolo }} {{ number_format($totalCobradoBase, 2, ',', '.') }}</strong>
+            </span>
+        </div>
+
+        @if ($pagosPorMetodo->isEmpty())
+            <p class="mt-6 text-sm text-gray-500">Todavía no hay pagos registrados.</p>
+        @else
+            <div class="mt-6 space-y-5">
+                @foreach ($pagosPorMetodo as $pago)
+                    @php
+                        $porcentaje = $totalCobradoBase > 0 ? ((float) $pago->monto_base / $totalCobradoBase) * 100 : 0.0;
+                    @endphp
+                    <div>
+                        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <span class="text-sm font-medium text-gray-900">{{ $pago->nombre }}</span>
+                            <span class="text-sm font-semibold text-gray-900">
+                                {{ $pago->simbolo }} {{ number_format((float) $pago->monto, 2, ',', '.') }}
+                            </span>
+                        </div>
+                        <div class="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                            <div
+                                class="h-2.5 rounded-full {{ $colores[$loop->index % count($colores)] }} transition-all"
+                                style="width: {{ number_format($porcentaje, 2, '.', '') }}%"
+                                role="img"
+                                aria-label="{{ $pago->nombre }}: {{ number_format($porcentaje, 1, ',', '.') }}% del total cobrado"
+                            ></div>
+                        </div>
+                        <p class="mt-1.5 text-xs text-gray-500">
+                            {{ number_format($porcentaje, 1, ',', '.') }}% del total · equivale a
+                            {{ $simbolo }} {{ number_format((float) $pago->monto_base, 2, ',', '.') }}
+                        </p>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="mt-6 rounded-lg bg-gray-50 p-4 text-xs text-gray-600">
+                <p class="font-medium text-gray-700">Cómo se calcula</p>
+                <ul class="mt-2 list-disc space-y-1 pl-4">
+                    <li>Cada barra muestra el monto cobrado con ese método de pago, en la moneda del propio método.</li>
+                    <li>El porcentaje se calcula sobre el equivalente en {{ $codigo !== '' ? $codigo : 'la moneda base' }}.</li>
+                    <li>No se cuentan las órdenes canceladas.</li>
+                </ul>
+            </div>
+        @endif
     </div>
 
     <div class="mt-6 rounded-2xl bg-white p-6 shadow">
