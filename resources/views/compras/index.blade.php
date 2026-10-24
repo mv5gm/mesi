@@ -393,6 +393,7 @@
 
     @push('scripts')
         <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
         <style>
         #compras-table_wrapper .dataTables_filter input {
             padding: 0.5rem 0.75rem;
@@ -508,6 +509,10 @@
 
         // Tasas vigentes: cuántas unidades de cada moneda equivalen a 1 dólar.
         const tasasVigentes = @json($tasasVigentes);
+        const ultimaTasa = @json($ultimaTasa);
+        const ultimaTasaMonedaId = @json($ultimaTasaMonedaId);
+        const defaultMonedaId = ultimaTasaMonedaId ?? monedaBaseId;
+        const defaultTasa = ultimaTasa ?? (tasasVigentes[monedaBaseId] ?? 1);
 
         function toast(message) {
             const el = document.getElementById('toast');
@@ -580,8 +585,8 @@
             return parseFloat(valor || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        function initSelect2Ajax(selectId, url, placeholder) {
-            return $(selectId).select2({
+        function initSelect2Ajax(selectId, url, placeholder, dropdownParent) {
+            const config = {
                 placeholder: placeholder,
                 allowClear: true,
                 language: 'es',
@@ -599,7 +604,11 @@
                         return { results: data };
                     },
                 },
-            });
+            };
+            if (dropdownParent) {
+                config.dropdownParent = dropdownParent;
+            }
+            return $(selectId).select2(config);
         }
 
         function lineaHTML(productoId, cantidad, unitario, bodyId) {
@@ -741,9 +750,9 @@
             const body = document.getElementById('register-detalles-body');
             body.innerHTML = '';
             $('#register-proveedor-id').val(null).trigger('change');
-            document.getElementById('register-moneda-id').value = @json($monedaBaseId);
+            document.getElementById('register-moneda-id').value = defaultMonedaId;
             document.getElementById('register-fecha-orden').value = new Date().toISOString().slice(0, 16);
-            document.getElementById('register-tasa-cambio').value = tasasVigentes[monedaBaseId] ?? 1;
+            document.getElementById('register-tasa-cambio').value = defaultTasa;
             document.getElementById('register-estado').value = 'PENDIENTE';
             document.getElementById('register-estado-pago').value = 'PENDIENTE';
             agregarLinea('register-detalles-body');
@@ -860,7 +869,7 @@
             }
         };
 
-        const proveedorSelect = initSelect2Ajax('#register-proveedor-id', '{{ route('proveedores.select2') }}', 'Busca un proveedor…');
+        const proveedorSelect = initSelect2Ajax('#register-proveedor-id', '{{ route('proveedores.select2') }}', 'Busca un proveedor…', $('#register-modal'));
 
         proveedorSelect
             .on('select2:select', async function (e) {
@@ -872,8 +881,8 @@
                 recomputarTotales('register-detalles-body');
             })
             .on('select2:clear', function () {
-                document.getElementById('register-moneda-id').value = @json($monedaBaseId);
-                document.getElementById('register-tasa-cambio').value = tasasVigentes[monedaBaseId] ?? 1;
+                document.getElementById('register-moneda-id').value = defaultMonedaId;
+                document.getElementById('register-tasa-cambio').value = defaultTasa;
 
                 recomputarTotales('register-detalles-body');
             });

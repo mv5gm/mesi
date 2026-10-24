@@ -9,6 +9,7 @@ use App\Models\Moneda;
 use App\Models\OrdenCompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
+use App\Models\TasaCambio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,12 +22,16 @@ class OrdenCompraController extends Controller
 {
     public function index(): View
     {
+        $ultimaTasa = TasaCambio::orderByDesc('fecha_efectiva')->orderByDesc('id')->first();
+
         return view('compras.index', [
             'listaProveedores' => $this->proveedoresParaSelect(),
             'listaMonedas' => Moneda::orderBy('codigo')->get(['id', 'codigo', 'nombre']),
             'listaProductos' => Producto::orderBy('nombre')->get(['id', 'sku', 'nombre']),
             'monedaBaseId' => $this->monedaBase()?->id,
             'tasasVigentes' => Moneda::tasasVigentes(),
+            'ultimaTasa' => $ultimaTasa ? (float) $ultimaTasa->tasa : null,
+            'ultimaTasaMonedaId' => $ultimaTasa?->moneda_id,
         ]);
     }
 
