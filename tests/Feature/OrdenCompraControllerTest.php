@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Almacen;
 use App\Models\DetalleOrdenCompra;
 use App\Models\Existencia;
-use App\Models\Moneda;
+use App\Models\MetodoPago;
 use App\Models\OrdenCompra;
 use App\Models\PagoOrdenCompra;
 use App\Models\Producto;
@@ -55,7 +55,6 @@ class OrdenCompraControllerTest extends TestCase
     {
         return [
             'proveedor_id' => Proveedor::factory()->create()->id,
-            'moneda_id' => Moneda::factory()->create()->id,
             'tasa_cambio' => '40.5000',
             'fecha_orden' => '2026-09-24T10:00',
             'estado' => 'PENDIENTE',
@@ -63,6 +62,9 @@ class OrdenCompraControllerTest extends TestCase
             'detalles' => [
                 ['producto_id' => Producto::factory()->create()->id, 'cantidad' => 2, 'costo_unitario' => 10.5],
                 ['producto_id' => Producto::factory()->create()->id, 'cantidad' => 3, 'costo_unitario' => 20.0],
+            ],
+            'pagos' => [
+                ['metodo_pago_id' => MetodoPago::factory()->create()->id, 'monto' => 81.00, 'tasa_cambio' => '40.5000', 'numero_referencia' => null, 'fecha_pago' => '2026-09-24T10:00'],
             ],
         ];
     }
@@ -118,10 +120,9 @@ class OrdenCompraControllerTest extends TestCase
         $this->assertDatabaseHas('ordenes_compra', [
             'proveedor_id' => $payload['proveedor_id'],
             'usuario_id' => $usuario->id,
-            'moneda_id' => $payload['moneda_id'],
             'tasa_cambio' => '40.5000',
-            'monto_total' => '81.00',
-            'monto_total_base' => '2.00',
+            'monto_total' => '3280.50',
+            'monto_total_base' => '81.00',
             'estado' => 'PENDIENTE',
             'estado_pago' => 'PENDIENTE',
         ]);
@@ -160,7 +161,7 @@ class OrdenCompraControllerTest extends TestCase
         $this->actingAs($this->adminUser())
             ->post('/compras', [], ['Accept' => 'application/json'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['proveedor_id', 'moneda_id', 'tasa_cambio', 'estado', 'detalles']);
+            ->assertJsonValidationErrors(['proveedor_id', 'tasa_cambio', 'estado', 'detalles', 'pagos']);
 
         $this->assertDatabaseCount('ordenes_compra', 0);
         $this->assertDatabaseCount('detalles_orden_compra', 0);
@@ -197,8 +198,8 @@ class OrdenCompraControllerTest extends TestCase
 
         $this->assertDatabaseHas('ordenes_compra', [
             'id' => $orden->id,
-            'monto_total' => '81.00',
-            'monto_total_base' => '2.00',
+            'monto_total' => '3280.50',
+            'monto_total_base' => '81.00',
         ]);
 
         $this->assertDatabaseMissing('detalles_orden_compra', ['id' => $detalle->id]);

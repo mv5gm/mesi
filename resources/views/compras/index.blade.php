@@ -93,22 +93,15 @@
                         </div>
                         <div>
                             <label for="register-tasa-cambio" class="block text-sm font-medium">Tasa de cambio</label>
-                            <input
-                                id="register-tasa-cambio"
-                                type="number"
-                                name="tasa_cambio"
-                                required
-                                min="0"
-                                step="0.0001"
-                                placeholder="1.0000"
-                                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            >
+                            <select id="register-tasa-cambio" class="mt-1 w-full"></select>
+                            <input type="hidden" name="tasa_cambio" id="register-tasa-cambio-valor" value="1">
+                            <p class="mt-1 text-xs text-gray-500">Se preselecciona la última tasa registrada y se ajusta a la moneda del método de pago.</p>
                         </div>
                         <div>
                             <label for="register-estado" class="block text-sm font-medium">Estado</label>
                             <select id="register-estado" name="estado" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
                                 <option value="PENDIENTE">PENDIENTE</option>
-                                <option value="RECIBIDA">RECIBIDA</option>
+                                <option value="RECIBIDA" selected>RECIBIDA</option>
                                 <option value="CANCELADA">CANCELADA</option>
                             </select>
                         </div>
@@ -119,7 +112,7 @@
                         <select id="register-estado-pago" name="estado_pago" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
                             <option value="PENDIENTE">PENDIENTE</option>
                             <option value="PARCIAL">PARCIAL</option>
-                            <option value="PAGADO">PAGADO</option>
+                            <option value="PAGADO" selected>PAGADO</option>
                         </select>
                     </div>
 
@@ -144,6 +137,39 @@
                                 </tr>
                             </thead>
                             <tbody id="register-detalles-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="rounded-lg border border-gray-200 p-4 mt-4">
+                        <div class="mb-3 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold">Pagos de la orden</h3>
+                            <div class="flex items-center gap-3">
+                                <span id="register-pagos-cobertura" class="text-xs font-medium text-gray-500">Cubierto: 0,00 de 0,00</span>
+                                <button
+                                    type="button"
+                                    onclick="agregarPago('register-pagos-body')"
+                                    class="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                                >
+                                    <svg class="mr-1 inline h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Agregar pago
+                                </button>
+                            </div>
+                        </div>
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
+                                    <th class="py-1 pr-2 font-medium">Método de pago</th>
+                                    <th class="w-32 px-2 py-1 font-medium">Monto</th>
+                                    <th class="w-32 px-2 py-1 font-medium">Tasa</th>
+                                    <th class="w-32 px-2 py-1 text-right font-medium">Monto base</th>
+                                    <th class="w-32 px-2 py-1 font-medium">Referencia</th>
+                                    <th class="w-24 px-2 py-1 font-medium">Fecha</th>
+                                    <th class="w-12 py-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="register-pagos-body"></tbody>
                         </table>
                     </div>
 
@@ -492,6 +518,7 @@
         <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
         <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        let monedaOrdenId = null;
 
         // Tabla de compras, se recarga al registrar, editar o eliminar una orden.
         let dataTable = null;
@@ -505,14 +532,16 @@
         const proveedorOptions = @json($listaProveedores);
         const monedaOptions = @json($listaMonedas->mapWithKeys(fn ($moneda) => [$moneda->id => "{$moneda->codigo} — {$moneda->nombre}"]));
         const productoOptions = @json($listaProductos->mapWithKeys(fn ($producto) => [$producto->id => "{$producto->sku} — {$producto->nombre}"]));
+        const productoCostos = @json($listaProductos->mapWithKeys(fn ($producto) => [$producto->id => (float) $producto->precio_costo]));
         const monedaBaseId = @json($monedaBaseId);
 
         // Tasas vigentes: cuántas unidades de cada moneda equivalen a 1 dólar.
         const tasasVigentes = @json($tasasVigentes);
-        const ultimaTasa = @json($ultimaTasa);
+        const metodosPagoOptions = @json($metodosPagoOptions);
+        const ultimaTasaInicial = @json($ultimaTasa);
         const ultimaTasaMonedaId = @json($ultimaTasaMonedaId);
         const defaultMonedaId = ultimaTasaMonedaId ?? monedaBaseId;
-        const defaultTasa = ultimaTasa ?? (tasasVigentes[monedaBaseId] ?? 1);
+        const defaultTasa = ultimaTasaInicial ?? (tasasVigentes[monedaBaseId] ?? 1);
 
         function toast(message) {
             const el = document.getElementById('toast');
@@ -611,19 +640,19 @@
             return $(selectId).select2(config);
         }
 
-        function lineaHTML(productoId, cantidad, unitario, bodyId) {
+        function lineaHTML(productoId, cantidad, unitario, bodyId, index) {
             return `
                 <tr>
                     <td class="py-1 pr-2">
-                        <select name="detalles[][producto_id]" required class="w-full">
+                        <select name="detalles[${index}][producto_id]" required class="w-full" onchange="onProductoChange(this)">
                             ${productoOptionHTML(productoId)}
                         </select>
                     </td>
                     <td class="px-2 py-1">
-                        <input type="number" name="detalles[][cantidad]" required min="1" step="1" value="${cantidad || ''}" class="w-full">
+                        <input type="number" name="detalles[${index}][cantidad]" required min="1" step="1" value="${cantidad || ''}" class="w-full">
                     </td>
                     <td class="px-2 py-1">
-                        <input type="number" name="detalles[][costo_unitario]" required min="0" step="0.01" value="${unitario || ''}" class="w-full" placeholder="0.00">
+                        <input type="number" name="detalles[${index}][costo_unitario]" required min="0" step="0.01" value="${unitario || ''}" class="w-full" placeholder="0.00">
                     </td>
                     <td class="px-2 py-1 text-right font-medium subtotal">${formatoNumero(0)}</td>
                     <td class="w-12 py-1 text-right">
@@ -647,14 +676,82 @@
 
         function agregarLinea(bodyId) {
             const body = document.getElementById(bodyId);
-            body.insertAdjacentHTML('beforeend', lineaHTML('', '', '', bodyId));
+            const index = body.querySelectorAll('tr').length;
+            body.insertAdjacentHTML('beforeend', lineaHTML('', '', '', bodyId, index));
             recomputarTotales(bodyId);
         }
 
         function quitarLinea(button) {
             const body = button.closest('tbody');
             button.closest('tr').remove();
+            renumerarCampos(body.id);
             recomputarTotales(body.id);
+        }
+
+        function eliminarFilasVacias(bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            const rows = Array.from(body.querySelectorAll('tr'));
+            rows.forEach((row) => {
+                const productoSelect = row.querySelector('select[name*="[producto_id]"]');
+
+                if (!productoSelect || productoSelect.value === '') {
+                    row.remove();
+                }
+            });
+        }
+
+        function eliminarPagosVacias(bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            const rows = Array.from(body.querySelectorAll('tr'));
+            rows.forEach((row) => {
+                const metodoSelect = row.querySelector('select[name*="[metodo_pago_id]"]');
+                const montoInput = row.querySelector('input[name*="[monto]"]');
+                const tasaInput = row.querySelector('input[name*="[tasa_cambio]"]');
+                const fechaInput = row.querySelector('input[name*="[fecha_pago]"]');
+
+                const estaVacia = !metodoSelect
+                    || metodoSelect.value === ''
+                    || !montoInput
+                    || montoInput.value === ''
+                    || !tasaInput
+                    || tasaInput.value === ''
+                    || !fechaInput
+                    || fechaInput.value === '';
+
+                if (estaVacia) {
+                    row.remove();
+                }
+            });
+        }
+
+        function contarFilasValidas(bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return 0;
+            let count = 0;
+            body.querySelectorAll('tr').forEach((row) => {
+                const productoSelect = row.querySelector('select[name*="[producto_id]"]');
+                if (productoSelect && productoSelect.value !== '') {
+                    count++;
+                }
+            });
+            return count;
+        }
+
+        function onProductoChange(selectEl) {
+            const row = selectEl.closest('tr');
+            const body = row ? row.closest('tbody') : null;
+            const costoInput = row ? row.querySelector('input[name*="costo_unitario"]') : null;
+            const productoId = selectEl.value;
+
+            if (costoInput && productoCostos && productoCostos[productoId] !== undefined) {
+                costoInput.value = productoCostos[productoId];
+            }
+
+            if (body) {
+                recomputarTotales(body.id);
+            }
         }
 
         function recomputarTotales(bodyId) {
@@ -663,27 +760,420 @@
             let total = 0;
 
             body.querySelectorAll('tr').forEach((row) => {
-                const cantidad = parseFloat(row.querySelector('input[name="detalles[][cantidad]"]').value) || 0;
-                const unitario = parseFloat(row.querySelector('input[name="detalles[][costo_unitario]"]').value) || 0;
+                const cantidad = parseFloat(row.querySelector('input[name*="[cantidad]"]').value) || 0;
+                const unitario = parseFloat(row.querySelector('input[name*="[costo_unitario]"]').value) || 0;
                 const subtotal = cantidad * unitario;
                 row.querySelector('.subtotal').textContent = formatoNumero(subtotal);
                 total += subtotal;
             });
 
-            const tasa = parseFloat(document.getElementById(modo + '-tasa-cambio').value) || 0;
-            document.getElementById(modo + '-total').textContent = formatoNumero(total);
-            document.getElementById(modo + '-total-base').textContent = formatoNumero(tasa > 0 ? total / tasa : 0);
+            const tasaEl = document.getElementById(modo + '-tasa-cambio-valor') || document.getElementById(modo + '-tasa-cambio');
+            const tasa = parseFloat(tasaEl ? tasaEl.value : '1') || 0;
+            const totalEl = document.getElementById(modo + '-total');
+            const totalMonedaOrden = tasa > 0 ? total * tasa : total;
+            totalEl.textContent = formatoNumero(totalMonedaOrden);
+            totalEl.dataset.valor = totalMonedaOrden;
+            document.getElementById(modo + '-total-base').textContent = formatoNumero(total);
+
+            sincronizarMontoUnico(modo);
+            recomputarPagos(modo + '-pagos-body');
+        }
+
+        function initTasaSelect2(selectId, modo) {
+            $(selectId).select2({
+                placeholder: 'Busca una tasa…',
+                allowClear: true,
+                language: 'es',
+                minimumInputLength: 0,
+                width: '100%',
+                ajax: {
+                    url: '{{ route('tasas.select2') }}',
+                    dataType: 'json',
+                    delay: 250,
+                    cache: true,
+                    data: function (params) {
+                        return {
+                            q: params.term || '',
+                            moneda_id: monedaOrdenId || '',
+                        };
+                    },
+                    processResults: function (data) {
+                        return { results: data || [] };
+                    },
+                    error: function () {
+                        return { results: [] };
+                    },
+                },
+            }).on('select2:select', function (e) {
+                const tasa = e.params.data.tasa;
+                document.getElementById(modo + '-tasa-cambio-valor').value = tasa;
+                recomputarTotales(modo + '-detalles-body');
+                recomputarPagos(modo + '-pagos-body');
+            }).on('select2:clear', function () {
+                document.getElementById(modo + '-tasa-cambio-valor').value = '1';
+                recomputarTotales(modo + '-detalles-body');
+                recomputarPagos(modo + '-pagos-body');
+            });
+        }
+
+        function aplicarTasaOrden(modo, tasa) {
+            if (!tasa) {
+                return;
+            }
+
+            const select = $(document.getElementById(modo + '-tasa-cambio'));
+            const etiqueta = tasa.codigo
+                ? `${tasa.codigo} — ${tasa.tasa} (${tasa.fecha_efectiva})`
+                : `${tasa.tasa} (${tasa.fecha_efectiva})`;
+
+            select.append(new Option(etiqueta, tasa.id, true, true)).trigger('change');
+            document.getElementById(modo + '-tasa-cambio-valor').value = tasa.tasa;
+        }
+
+        async function ultimaTasa(monedaId) {
+            try {
+                const url = '{{ route('tasas.ultima') }}' + (monedaId ? '?moneda_id=' + encodeURIComponent(monedaId) : '');
+                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+
+                return await response.json();
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function seleccionarUltimaTasa(modo) {
+            const tasa = await ultimaTasa(null);
+
+            aplicarTasaOrden(modo, tasa);
+        }
+
+        async function aplicarTasaDeLaMoneda(modo, metodo) {
+            if (!metodo || !metodo.moneda_id || String(metodo.moneda_id) === String(monedaBaseId)) {
+                $(document.getElementById(modo + '-tasa-cambio')).empty().trigger('change');
+                document.getElementById(modo + '-tasa-cambio-valor').value = 1;
+
+                return;
+            }
+
+            const tasa = await ultimaTasa(metodo.moneda_id);
+
+            aplicarTasaOrden(modo, tasa);
+        }
+
+        function initMetodoPagoSelect2(selectEl) {
+            $(selectEl).select2({
+                placeholder: 'Selecciona un método de pago',
+                allowClear: true,
+                language: 'es',
+                width: '100%',
+            }).on('select2:select', function (e) {
+                const row = selectEl.closest('tr');
+                const modo = modoDeFila(row);
+                const metodosAnteriores = pagosConMetodo(modo).length - 1;
+
+                aplicarMonedaMetodo(row, e.params.data.id, metodosAnteriores);
+            }).on('select2:clear', function () {
+                const row = selectEl.closest('tr');
+                const modo = modoDeFila(row);
+                const label = row.querySelector('.moneda-pago-label');
+
+                if (label) label.textContent = '';
+
+                actualizarMontosDePagos(modo, pagosConMetodo(modo).length + 1);
+            });
+        }
+
+        function etiquetaMoneda(metodoPagoId) {
+            const metodo = metodosPagoOptions[String(metodoPagoId)];
+
+            if (!metodo) {
+                return '';
+            }
+
+            return `Moneda: ${metodo.moneda_codigo ?? '—'} — ${metodo.moneda_nombre ?? ''}`;
+        }
+
+        function actualizarEtiquetaMoneda(row, metodoPagoId) {
+            const label = row.querySelector('.moneda-pago-label');
+
+            if (label) {
+                label.textContent = etiquetaMoneda(metodoPagoId);
+            }
+        }
+
+        async function aplicarMonedaMetodo(row, metodoPagoId, metodosAnteriores) {
+            const metodo = metodosPagoOptions[String(metodoPagoId)];
+            const tasaInput = row.querySelector('input[name*="[tasa_cambio]"]');
+            const montoInput = row.querySelector('input[name*="[monto]"]');
+            const montoBaseSpan = row.querySelector('.monto-base-pago');
+
+            actualizarEtiquetaMoneda(row, metodoPagoId);
+
+            if (!metodo) {
+                return;
+            }
+
+            let tasa = 1;
+
+            if (metodo.moneda_id && String(metodo.moneda_id) !== String(monedaBaseId)) {
+                const tasaCambio = await ultimaTasa(metodo.moneda_id);
+
+                if (tasaCambio && tasaCambio.tasa !== undefined) {
+                    tasa = tasaCambio.tasa;
+                }
+            }
+
+            if (tasaInput) tasaInput.value = tasa;
+
+            if (montoInput && montoBaseSpan) {
+                montoBaseSpan.textContent = formatoNumero((parseFloat(montoInput.value) || 0) / tasa);
+            }
+
+            await heredarMonedaEnLaOrden(row, metodo, tasa);
+
+            actualizarMontosDePagos(modoDeFila(row), metodosAnteriores);
+        }
+
+        async function heredarMonedaEnLaOrden(row, metodo, tasa) {
+            const body = row.closest('tbody');
+
+            if (!body || row !== body.querySelector('tr')) {
+                return;
+            }
+
+            const modo = body.id.startsWith('register') ? 'register' : 'edit';
+
+            monedaOrdenId = metodo.moneda_id;
+
+            await aplicarTasaDeLaMoneda(modo, metodo);
+
+            recomputarTotales(modo + '-detalles-body');
+        }
+
+        function pagoHTML(metodoPagoId, monto, tasa, montoBase, referencia, fecha, index) {
+            const metodoOptionHTML = Object.entries(metodosPagoOptions).map(([id, data]) => {
+                const selected = String(id) === String(metodoPagoId) ? ' selected' : '';
+                const label = `${data.nombre} (${data.moneda_codigo ?? '—'})`;
+                return `<option value="${id}"${selected}>${label}</option>`;
+            }).join('');
+            const monedaLabel = etiquetaMoneda(metodoPagoId);
+
+            return `
+                <tr>
+                    <td class="py-1 pr-2">
+                        <select name="pagos[${index}][metodo_pago_id]" required class="metodo-pago-select w-full">
+                            <option value="">Selecciona un método</option>
+                            ${metodoOptionHTML}
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 moneda-pago-label">${monedaLabel}</p>
+                    </td>
+                    <td class="px-2 py-1">
+                        <input type="number" name="pagos[${index}][monto]" required min="0" step="0.01" value="${monto || ''}" class="w-full monto-pago-input" placeholder="0.00">
+                    </td>
+                    <td class="px-2 py-1">
+                        <input type="number" name="pagos[${index}][tasa_cambio]" required min="0" step="0.0001" value="${tasa || ''}" class="w-full tasa-pago-input" placeholder="0.0000">
+                    </td>
+                    <td class="px-2 py-1 text-right font-medium">
+                        <span class="monto-base-pago">${formatoNumero(montoBase || 0)}</span>
+                    </td>
+                    <td class="px-2 py-1">
+                        <input type="text" name="pagos[${index}][numero_referencia]" value="${referencia || ''}" class="w-full referencia-pago-input" placeholder="Referencia">
+                    </td>
+                    <td class="px-2 py-1">
+                        <input type="datetime-local" name="pagos[${index}][fecha_pago]" required value="${fecha || ''}" class="w-full fecha-pago-input">
+                    </td>
+                    <td class="w-12 py-1 text-right">
+                        <button type="button" onclick="quitarPago(this)" class="rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </td>
+                </tr>`;
+        }
+
+        function renumerarCampos(bodyId, prefix) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            body.querySelectorAll('tr').forEach((row, index) => {
+                row.querySelectorAll('[name]').forEach((input) => {
+                    const name = input.getAttribute('name');
+                    const newName = name.replace(/\[\d+\]/g, `[${index}]`);
+                    input.setAttribute('name', newName);
+                });
+            });
+        }
+
+        function agregarPago(bodyId) {
+            const body = document.getElementById(bodyId);
+            const index = body.querySelectorAll('tr').length;
+            const fechaHoy = new Date().toISOString().slice(0, 16);
+            const tasaInput = document.getElementById(bodyId.startsWith('register') ? 'register-tasa-cambio-valor' : 'edit-tasa-cambio-valor');
+            const tasa = tasaInput ? tasaInput.value : '1';
+            body.insertAdjacentHTML('beforeend', pagoHTML('', '', tasa, '', '', fechaHoy, index));
+            const row = body.querySelector('tr:last-child');
+            const metodoSelect = row.querySelector('select.metodo-pago-select');
+            initMetodoPagoSelect2(metodoSelect);
+            configurarPagoListeners(row);
+            recomputarPagos(bodyId);
+        }
+
+        function quitarPago(button) {
+            const body = button.closest('tbody');
+            button.closest('tr').remove();
+            renumerarCampos(body.id, 'pagos');
+            const modo = body.id.startsWith('register') ? 'register' : 'edit';
+            sincronizarMontoUnico(modo);
+            recomputarPagos(body.id);
+        }
+
+        function configurarPagoListeners(row) {
+            const montoInput = row.querySelector('input[name*="[monto]"]');
+            const tasaInput = row.querySelector('input[name*="[tasa_cambio]"]');
+            const montoBaseSpan = row.querySelector('.monto-base-pago');
+
+            const recalcular = () => {
+                const monto = parseFloat(montoInput.value) || 0;
+                const tasa = parseFloat(tasaInput.value) || 0;
+                montoBaseSpan.textContent = formatoNumero(tasa > 0 ? monto / tasa : 0);
+                const body = row.closest('tbody');
+                recomputarPagos(body.id);
+            };
+
+            montoInput.addEventListener('input', () => {
+                montoInput.dataset.manual = '1';
+                recalcular();
+            });
+            tasaInput.addEventListener('input', recalcular);
+        }
+
+        function modoDeFila(row) {
+            const body = row.closest('tbody');
+
+            return body && body.id.startsWith('register') ? 'register' : 'edit';
+        }
+
+        function totalDeLaOrden(modo) {
+            const total = document.getElementById(modo + '-total');
+
+            return parseFloat(total ? total.dataset.valor || '0' : '0') || 0;
+        }
+
+        function pagosConMetodo(modo) {
+            const body = document.getElementById(modo + '-pagos-body');
+
+            if (!body) {
+                return [];
+            }
+
+            return Array.from(body.querySelectorAll('tr')).filter((fila) => {
+                const select = fila.querySelector('select.metodo-pago-select');
+
+                return select && select.value !== '';
+            });
+        }
+
+        function sincronizarMontoUnico(modo) {
+            const conMetodo = pagosConMetodo(modo);
+
+            if (conMetodo.length !== 1) {
+                return;
+            }
+
+            const montoInput = conMetodo[0].querySelector('input[name*="[monto]"]');
+
+            if (!montoInput || montoInput.dataset.manual === '1') {
+                return;
+            }
+
+            const total = totalDeLaOrden(modo);
+
+            if (total <= 0) {
+                return;
+            }
+
+            montoInput.value = total.toFixed(2);
+            recomputarPagos(modo + '-pagos-body');
+        }
+
+        function actualizarMontosDePagos(modo, metodosAnteriores) {
+            const conMetodo = pagosConMetodo(modo);
+
+            if (conMetodo.length === 1) {
+                const montoInput = conMetodo[0].querySelector('input[name*="[monto]"]');
+                const total = totalDeLaOrden(modo);
+
+                if (montoInput && total > 0) {
+                    montoInput.value = total.toFixed(2);
+                    delete montoInput.dataset.manual;
+                }
+            } else if (conMetodo.length > 1 && metodosAnteriores < 2) {
+                const body = document.getElementById(modo + '-pagos-body');
+
+                body.querySelectorAll('tr').forEach((fila) => {
+                    const montoInput = fila.querySelector('input[name*="[monto]"]');
+
+                    if (montoInput) {
+                        montoInput.value = '';
+                        delete montoInput.dataset.manual;
+                    }
+                });
+            }
+
+            recomputarPagos(modo + '-pagos-body');
+        }
+
+        function recomputarPagos(bodyId) {
+            const body = document.getElementById(bodyId);
+
+            if (!body) {
+                return;
+            }
+
+            let sumaMontos = 0;
+
+            body.querySelectorAll('tr').forEach((row) => {
+                const monto = parseFloat(row.querySelector('input[name*="[monto]"]').value) || 0;
+                const tasa = parseFloat(row.querySelector('input[name*="[tasa_cambio]"]').value) || 0;
+                const montoBase = tasa > 0 ? monto / tasa : 0;
+                sumaMontos += monto;
+                row.querySelector('.monto-base-pago').textContent = formatoNumero(montoBase);
+            });
+
+            const modo = bodyId.startsWith('register') ? 'register' : 'edit';
+            const indicador = document.getElementById(modo + '-pagos-cobertura');
+
+            if (!indicador) {
+                return;
+            }
+
+            const total = totalDeLaOrden(modo);
+            const falta = total - sumaMontos;
+
+            indicador.textContent = `Cubierto: ${formatoNumero(sumaMontos)} de ${formatoNumero(total)}`;
+            indicador.classList.toggle('text-red-600', falta > 0.01);
+            indicador.classList.toggle('text-emerald-600', falta <= 0.01);
         }
 
         function configurarRecalculo() {
             ['register-detalles-body', 'edit-detalles-body'].forEach((bodyId) => {
-                document.getElementById(bodyId).addEventListener('input', (event) => recomputarTotales(bodyId));
+                const body = document.getElementById(bodyId);
+                if (!body) return;
+                body.addEventListener('input', () => recomputarTotales(bodyId));
+                body.addEventListener('change', (event) => {
+                    if (event.target.matches('select[name*="[producto_id]"]')) {
+                        onProductoChange(event.target);
+                    }
+                });
             });
 
-            ['register-tasa-cambio', 'edit-tasa-cambio'].forEach((id) => {
-                document.getElementById(id).addEventListener('input', () => {
-                    const modo = id.startsWith('register') ? 'register' : 'edit';
+            ['register-tasa-cambio', 'edit-tasa-cambio'].forEach((selectId) => {
+                const el = document.getElementById(selectId);
+                if (!el) return;
+                $(el).on('select2:select', function () {
+                    const modo = selectId.startsWith('register') ? 'register' : 'edit';
                     recomputarTotales(modo + '-detalles-body');
+                    recomputarPagos(modo + '-pagos-body');
                 });
             });
 
@@ -691,7 +1181,7 @@
                 document.getElementById(id).addEventListener('change', (event) => {
                     const modo = id.startsWith('register') ? 'register' : 'edit';
                     const tasa = tasasVigentes[event.target.value] ?? 1;
-                    document.getElementById(modo + '-tasa-cambio').value = tasa;
+                    document.getElementById(modo + '-tasa-cambio-valor').value = tasa;
                     recomputarTotales(modo + '-detalles-body');
                 });
             });
@@ -745,17 +1235,27 @@
             }
         };
 
-        window.openRegisterModal = function () {
+        window.openRegisterModal = async function () {
             document.getElementById('register-form').reset();
             const body = document.getElementById('register-detalles-body');
             body.innerHTML = '';
             $('#register-proveedor-id').val(null).trigger('change');
-            document.getElementById('register-moneda-id').value = defaultMonedaId;
+            $('#register-tasa-cambio').empty().trigger('change');
+            document.getElementById('register-tasa-cambio-valor').value = '1';
             document.getElementById('register-fecha-orden').value = new Date().toISOString().slice(0, 16);
-            document.getElementById('register-tasa-cambio').value = defaultTasa;
-            document.getElementById('register-estado').value = 'PENDIENTE';
-            document.getElementById('register-estado-pago').value = 'PENDIENTE';
+            document.getElementById('register-estado').value = 'RECIBIDA';
+            document.getElementById('register-estado-pago').value = 'PAGADO';
+
+            monedaOrdenId = null;
+
             agregarLinea('register-detalles-body');
+
+            const pagosBody = document.getElementById('register-pagos-body');
+            pagosBody.innerHTML = '';
+            agregarPago('register-pagos-body');
+
+            await seleccionarUltimaTasa('register');
+
             clearErrors('register-errors');
             openModal('register-modal');
         };
@@ -774,8 +1274,8 @@
 
             try {
                 const detalles = JSON.parse(button.dataset.detalles || '[]');
-                detalles.forEach((detalle) => {
-                    body.insertAdjacentHTML('beforeend', lineaHTML(detalle.producto_id, detalle.cantidad, detalle.unitario, 'edit-detalles-body'));
+                detalles.forEach((detalle, index) => {
+                    body.insertAdjacentHTML('beforeend', lineaHTML(detalle.producto_id, detalle.cantidad, detalle.unitario, 'edit-detalles-body', index));
                 });
             } catch (e) {
                 agregarLinea('edit-detalles-body');
@@ -832,10 +1332,22 @@
         }
 
         window.submitRegister = function () {
+            eliminarFilasVacias('register-detalles-body');
+            eliminarPagosVacias('register-pagos-body');
+            if (contarFilasValidas('register-detalles-body') === 0) {
+                toast('Debes agregar al menos un producto con cantidad y costo unitario.');
+                return;
+            }
             enviarFormulario(document.getElementById('register-form'), 'register-overlay');
         };
 
         window.submitEdit = function () {
+            eliminarFilasVacias('edit-detalles-body');
+            eliminarPagosVacias('edit-pagos-body');
+            if (contarFilasValidas('edit-detalles-body') === 0) {
+                toast('Debes agregar al menos un producto con cantidad y costo unitario.');
+                return;
+            }
             enviarFormulario(document.getElementById('edit-form'), 'edit-overlay');
         };
 
@@ -873,19 +1385,13 @@
 
         proveedorSelect
             .on('select2:select', async function (e) {
-                const proveedor = e.params.data;
-
-                document.getElementById('register-moneda-id').value = proveedor.moneda_id ?? @json($monedaBaseId);
-                document.getElementById('register-tasa-cambio').value = tasasVigentes[proveedor.moneda_id] ?? 1;
-
                 recomputarTotales('register-detalles-body');
             })
             .on('select2:clear', function () {
-                document.getElementById('register-moneda-id').value = defaultMonedaId;
-                document.getElementById('register-tasa-cambio').value = defaultTasa;
-
                 recomputarTotales('register-detalles-body');
             });
+
+        initTasaSelect2('#register-tasa-cambio', 'register');
 
         configurarRecalculo();
 

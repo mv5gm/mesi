@@ -22,6 +22,7 @@ class Producto extends Model
         'codigo_barras',
         'nombre',
         'descripcion',
+        'imagen',
         'precio_costo',
         'precio_venta',
         'stock_minimo',
@@ -40,6 +41,14 @@ class Producto extends Model
     public function categoria(): BelongsTo
     {
         return $this->belongsTo(Categoria::class, 'categoria_id');
+    }
+
+    /**
+     * URL pública de la imagen del producto, si tiene una.
+     */
+    public function getImagenUrlAttribute(): ?string
+    {
+        return $this->imagen !== null ? asset($this->imagen) : null;
     }
 
     public function moneda(): BelongsTo

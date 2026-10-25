@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\EstadoOrdenCompra;
 use App\Enums\EstadoPago;
 use App\Models\Existencia;
+use App\Models\MetodoPago;
 use App\Models\Moneda;
 use App\Models\OrdenCompra;
 use App\Models\Producto;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrdenCompraController extends Controller
@@ -27,9 +29,10 @@ class OrdenCompraController extends Controller
         return view('compras.index', [
             'listaProveedores' => $this->proveedoresParaSelect(),
             'listaMonedas' => Moneda::orderBy('codigo')->get(['id', 'codigo', 'nombre']),
-            'listaProductos' => Producto::orderBy('nombre')->get(['id', 'sku', 'nombre']),
+            'listaProductos' => Producto::orderBy('nombre')->get(['id', 'sku', 'nombre', 'precio_costo']),
             'monedaBaseId' => $this->monedaBase()?->id,
             'tasasVigentes' => Moneda::tasasVigentes(),
+            'metodosPagoOptions' => $this->metodosPagoOptions(),
             'ultimaTasa' => $ultimaTasa ? (float) $ultimaTasa->tasa : null,
             'ultimaTasaMonedaId' => $ultimaTasa?->moneda_id,
         ]);
@@ -86,17 +89,36 @@ class OrdenCompraController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $detalles = array_values(array_filter(
+            $request->input('detalles', []),
+            fn ($d) => isset($d['producto_id']) && $d['producto_id'] !== ''
+                && isset($d['cantidad']) && $d['cantidad'] !== ''
+                && isset($d['costo_unitario']) && $d['costo_unitario'] !== ''
+        ));
+        $request->merge(['detalles' => $detalles]);
+
+        $pagos = array_values(array_filter(
+            $request->input('pagos', []),
+            fn ($p) => isset($p['metodo_pago_id']) && $p['metodo_pago_id'] !== ''
+                && isset($p['monto']) && $p['monto'] !== ''
+                && isset($p['tasa_cambio']) && $p['tasa_cambio'] !== ''
+                && isset($p['fecha_pago']) && $p['fecha_pago'] !== ''
+        ));
+        $request->merge(['pagos' => $pagos]);
+
         $validated = $this->validarDatos($request);
 
         $detalles = $validated['detalles'];
-        $montoTotal = $this->calcularMontoTotal($detalles);
-        $montoTotalBase = round($montoTotal / (float) $validated['tasa_cambio'], 2);
+        $pagos = $validated['pagos'];
+        $monedaId = $this->monedaDeLosPagos($pagos);
+        $montoTotalBase = $this->calcularMontoTotal($detalles);
+        $montoTotal = round($montoTotalBase * (float) $validated['tasa_cambio'], 2);
 
-        $orden = DB::transaction(function () use ($validated, $montoTotal, $montoTotalBase): OrdenCompra {
+        $orden = DB::transaction(function () use ($validated, $detalles, $pagos, $monedaId, $montoTotal, $montoTotalBase): OrdenCompra {
             $orden = OrdenCompra::create([
                 'proveedor_id' => $validated['proveedor_id'],
                 'usuario_id' => auth()->id(),
-                'moneda_id' => $validated['moneda_id'],
+                'moneda_id' => $monedaId,
                 'tasa_cambio' => $validated['tasa_cambio'],
                 'monto_total' => $montoTotal,
                 'monto_total_base' => $montoTotalBase,
@@ -106,15 +128,17 @@ class OrdenCompraController extends Controller
             ]);
 
             $orden->detalles()->createMany(
-                collect($validated['detalles'])->map(fn (array $detalle): array => [
+                collect($detalles)->map(fn (array $detalle): array => [
                     'producto_id' => $detalle['producto_id'],
                     'cantidad' => $detalle['cantidad'],
                     'costo_unitario' => $detalle['costo_unitario'],
                 ])
             );
 
+            $orden->pagos()->createMany($this->prepararPagos($pagos));
+
             if ($validated['estado'] !== EstadoOrdenCompra::Cancelada->value) {
-                foreach ($validated['detalles'] as $detalle) {
+                foreach ($detalles as $detalle) {
                     Existencia::sumar((int) $detalle['producto_id'], (int) $detalle['cantidad']);
                 }
             }
@@ -127,13 +151,32 @@ class OrdenCompraController extends Controller
 
     public function update(Request $request, OrdenCompra $ordenCompra): JsonResponse
     {
-        $validated = $this->validarDatos($request);
+        $detalles = array_values(array_filter(
+            $request->input('detalles', []),
+            fn ($d) => isset($d['producto_id']) && $d['producto_id'] !== ''
+                && isset($d['cantidad']) && $d['cantidad'] !== ''
+                && isset($d['costo_unitario']) && $d['costo_unitario'] !== ''
+        ));
+        $request->merge(['detalles' => $detalles]);
+
+        $pagos = array_values(array_filter(
+            $request->input('pagos', []),
+            fn ($p) => isset($p['metodo_pago_id']) && $p['metodo_pago_id'] !== ''
+                && isset($p['monto']) && $p['monto'] !== ''
+                && isset($p['tasa_cambio']) && $p['tasa_cambio'] !== ''
+                && isset($p['fecha_pago']) && $p['fecha_pago'] !== ''
+        ));
+        $request->merge(['pagos' => $pagos]);
+
+        $validated = $this->validarDatos($request, $ordenCompra);
 
         $detalles = $validated['detalles'];
-        $montoTotal = $this->calcularMontoTotal($detalles);
-        $montoTotalBase = round($montoTotal / (float) $validated['tasa_cambio'], 2);
+        $pagos = $validated['pagos'] ?? [];
+        $monedaId = empty($pagos) ? $ordenCompra->moneda_id : $this->monedaDeLosPagos($pagos);
+        $montoTotalBase = $this->calcularMontoTotal($detalles);
+        $montoTotal = round($montoTotalBase * (float) $validated['tasa_cambio'], 2);
 
-        DB::transaction(function () use ($ordenCompra, $validated, $montoTotal, $montoTotalBase): void {
+        DB::transaction(function () use ($ordenCompra, $validated, $detalles, $pagos, $monedaId, $montoTotal, $montoTotalBase): void {
             $estadoAnterior = $ordenCompra->estado;
             $detallesAnteriores = $ordenCompra->detalles->map(fn ($d) => ['producto_id' => $d->producto_id, 'cantidad' => $d->cantidad])->all();
 
@@ -145,7 +188,7 @@ class OrdenCompraController extends Controller
 
             $ordenCompra->update([
                 'proveedor_id' => $validated['proveedor_id'],
-                'moneda_id' => $validated['moneda_id'],
+                'moneda_id' => $monedaId,
                 'tasa_cambio' => $validated['tasa_cambio'],
                 'monto_total' => $montoTotal,
                 'monto_total_base' => $montoTotalBase,
@@ -156,15 +199,20 @@ class OrdenCompraController extends Controller
 
             $ordenCompra->detalles()->delete();
             $ordenCompra->detalles()->createMany(
-                collect($validated['detalles'])->map(fn (array $detalle): array => [
+                collect($detalles)->map(fn (array $detalle): array => [
                     'producto_id' => $detalle['producto_id'],
                     'cantidad' => $detalle['cantidad'],
                     'costo_unitario' => $detalle['costo_unitario'],
                 ])
             );
 
+            if (! empty($pagos)) {
+                $ordenCompra->pagos()->delete();
+                $ordenCompra->pagos()->createMany($this->prepararPagos($pagos));
+            }
+
             if ($validated['estado'] !== EstadoOrdenCompra::Cancelada->value) {
-                foreach ($validated['detalles'] as $detalle) {
+                foreach ($detalles as $detalle) {
                     Existencia::sumar((int) $detalle['producto_id'], (int) $detalle['cantidad']);
                 }
             }
@@ -195,11 +243,14 @@ class OrdenCompraController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function validarDatos(Request $request): array
+    private function validarDatos(Request $request, ?OrdenCompra $ordenCompra = null): array
     {
+        $pagosRule = $ordenCompra === null
+            ? ['required', 'array', 'min:1']
+            : ['nullable', 'array'];
+
         return $request->validate([
             'proveedor_id' => ['required', 'integer', 'exists:proveedores,id'],
-            'moneda_id' => ['required', 'integer', 'exists:monedas,id'],
             'tasa_cambio' => ['required', 'numeric', 'min:0'],
             'fecha_orden' => ['required', 'date'],
             'estado' => ['required', Rule::enum(EstadoOrdenCompra::class)],
@@ -208,6 +259,12 @@ class OrdenCompraController extends Controller
             'detalles.*.producto_id' => ['required', 'integer', 'distinct', 'exists:productos,id'],
             'detalles.*.cantidad' => ['required', 'integer', 'min:1'],
             'detalles.*.costo_unitario' => ['required', 'numeric', 'min:0'],
+            'pagos' => $pagosRule,
+            'pagos.*.metodo_pago_id' => ['required_with:pagos', 'integer', 'exists:metodos_pago,id'],
+            'pagos.*.monto' => ['required_with:pagos', 'numeric', 'min:0'],
+            'pagos.*.tasa_cambio' => ['required_with:pagos', 'numeric', 'min:0'],
+            'pagos.*.numero_referencia' => ['nullable', 'string', 'max:100'],
+            'pagos.*.fecha_pago' => ['required_with:pagos', 'date'],
         ], [
             'proveedor_id.required' => 'Debes seleccionar un proveedor.',
             'proveedor_id.exists' => 'El proveedor seleccionado no es válido.',
@@ -254,6 +311,52 @@ class OrdenCompraController extends Controller
     private function monedaBase(): ?Moneda
     {
         return Moneda::where('es_moneda_base', true)->first();
+    }
+
+    private function prepararPagos(array $pagos): array
+    {
+        return collect($pagos)->map(fn (array $pago): array => [
+            'metodo_pago_id' => $pago['metodo_pago_id'],
+            'monto' => $pago['monto'],
+            'tasa_cambio' => $pago['tasa_cambio'],
+            'monto_base' => round((float) $pago['monto'] / (float) $pago['tasa_cambio'], 2),
+            'numero_referencia' => $pago['numero_referencia'] ?? null,
+            'fecha_pago' => $pago['fecha_pago'],
+        ])->all();
+    }
+
+    private function monedaDeLosPagos(array $pagos): int
+    {
+        $metodoPagoId = $pagos[0]['metodo_pago_id'] ?? null;
+
+        $monedaId = $metodoPagoId !== null
+            ? MetodoPago::whereKey($metodoPagoId)->value('moneda_id')
+            : null;
+
+        if ($monedaId === null) {
+            throw ValidationException::withMessages([
+                'pagos.0.metodo_pago_id' => 'El método de pago debe tener una moneda asignada.',
+            ]);
+        }
+
+        return (int) $monedaId;
+    }
+
+    private function metodosPagoOptions(): Collection
+    {
+        return MetodoPago::with('moneda:id,codigo,nombre,simbolo')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'requiere_referencia', 'moneda_id'])
+            ->mapWithKeys(fn (MetodoPago $metodo): array => [
+                $metodo->id => [
+                    'nombre' => $metodo->nombre,
+                    'requiere_referencia' => $metodo->requiere_referencia,
+                    'moneda_id' => $metodo->moneda_id,
+                    'moneda_codigo' => $metodo->moneda?->codigo,
+                    'moneda_nombre' => $metodo->moneda?->nombre,
+                    'moneda_simbolo' => $metodo->moneda?->simbolo,
+                ],
+            ]);
     }
 
     private function badgeEstado(EstadoOrdenCompra $estado): string

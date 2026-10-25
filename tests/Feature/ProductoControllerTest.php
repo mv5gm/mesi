@@ -8,7 +8,10 @@ use App\Models\Moneda;
 use App\Models\Producto;
 use App\Models\TasaCambio;
 use App\Models\User;
+use App\Services\ImagenProductoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -21,6 +24,20 @@ class ProductoControllerTest extends TestCase
 
     private Role $basicRole;
 
+    /**
+     * Archivos públicos creados por las pruebas, para eliminarlos al finalizar.
+     *
+     * @var array<int, string>
+     */
+    private array $archivosPublicos = [];
+
+    /**
+     * Archivos temporales creados por las pruebas.
+     *
+     * @var array<int, string>
+     */
+    private array $archivosTemporales = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -29,6 +46,19 @@ class ProductoControllerTest extends TestCase
         $this->adminRole = Role::findOrCreate('admin');
         $this->adminRole->givePermissionTo('gestionar productos');
         $this->basicRole = Role::findOrCreate('usuario');
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->archivosPublicos as $ruta) {
+            File::delete(public_path($ruta));
+        }
+
+        foreach ($this->archivosTemporales as $ruta) {
+            File::delete($ruta);
+        }
+
+        parent::tearDown();
     }
 
     private function adminUser(): User
@@ -80,6 +110,34 @@ class ProductoControllerTest extends TestCase
                 'recordsFiltered' => 1,
             ])
             ->assertJsonFragment(['sku' => $producto->sku]);
+    }
+
+    public function test_data_endpoint_includes_full_details_for_the_view_modal(): void
+    {
+        $categoria = Categoria::factory()->create(['nombre' => 'Filtros']);
+        $moneda = Moneda::factory()->create(['codigo' => 'USD', 'nombre' => 'Dólar', 'simbolo' => '$']);
+
+        Producto::factory()->create([
+            'categoria_id' => $categoria->id,
+            'moneda_id' => $moneda->id,
+            'nombre' => 'Filtro de Aceite',
+            'descripcion' => 'Filtro para motor',
+            'codigo_barras' => '7501234567890',
+            'stock_minimo' => 3,
+            'stock_maximo' => 50,
+            'unidad_medida' => 'PZA',
+        ]);
+
+        $acciones = $this->actingAs($this->adminUser())
+            ->get('/productos/datos?draw=1')
+            ->assertOk()
+            ->json('data.0.actions');
+
+        $this->assertStringContainsString('openViewModal', $acciones);
+        $this->assertStringContainsString('data-codigo-barras="7501234567890"', $acciones);
+        $this->assertStringContainsString('data-descripcion="Filtro para motor"', $acciones);
+        $this->assertStringContainsString('data-categoria-nombre="Filtros"', $acciones);
+        $this->assertStringContainsString('data-stock="0"', $acciones);
     }
 
     public function test_el_listado_muestra_el_precio_en_dolares_y_bolivares(): void
@@ -224,5 +282,173 @@ class ProductoControllerTest extends TestCase
             ->assertJson(['message' => 'Producto eliminado correctamente.']);
 
         $this->assertDatabaseMissing('productos', ['id' => $producto->id]);
+    }
+
+    public function test_product_can_be_created_with_an_image(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post('/productos', $this->datosProducto([
+                'imagen' => UploadedFile::fake()->image('foto.jpg', 900, 700),
+            ]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $producto = Producto::where('sku', 'PRD-IMG')->firstOrFail();
+        $this->archivosPublicos[] = $producto->imagen;
+
+        $this->assertStringStartsWith(ImagenProductoService::CARPETA.'/', $producto->imagen);
+        $this->assertFileExists(public_path($producto->imagen));
+        $this->assertSame('image/jpeg', mime_content_type(public_path($producto->imagen)));
+        $this->assertNotNull($producto->imagen_url);
+
+        $listado = $this->actingAs($this->adminUser())->get('/productos/datos?draw=1');
+
+        $listado->assertOk();
+        $this->assertStringContainsString('producto-imagen', $listado->json('data.0.imagen'));
+        $this->assertStringContainsString($producto->imagen, $listado->json('data.0.imagen'));
+    }
+
+    public function test_oversized_image_is_compressed_to_one_megabyte_or_less(): void
+    {
+        $rutaTemporal = $this->crearImagenPngPesada();
+        $this->assertGreaterThan(ImagenProductoService::PESO_MAXIMO, filesize($rutaTemporal));
+
+        $archivo = new UploadedFile($rutaTemporal, 'pesada.png', 'image/png', null, true);
+
+        $this->actingAs($this->adminUser())
+            ->post('/productos', $this->datosProducto(['imagen' => $archivo]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $producto = Producto::where('sku', 'PRD-IMG')->firstOrFail();
+        $this->archivosPublicos[] = $producto->imagen;
+        $rutaGuardada = public_path($producto->imagen);
+
+        clearstatcache(true, $rutaGuardada);
+
+        $this->assertFileExists($rutaGuardada);
+        $this->assertLessThanOrEqual(ImagenProductoService::PESO_MAXIMO, filesize($rutaGuardada));
+        $this->assertSame('image/jpeg', mime_content_type($rutaGuardada));
+    }
+
+    public function test_non_image_file_is_rejected(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post('/productos', $this->datosProducto([
+                'imagen' => UploadedFile::fake()->create('documento.pdf', 100, 'application/pdf'),
+            ]), ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['imagen']);
+
+        $this->assertDatabaseCount('productos', 0);
+    }
+
+    public function test_updating_the_image_replaces_and_deletes_the_previous_file(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post('/productos', $this->datosProducto([
+                'imagen' => UploadedFile::fake()->image('foto.jpg', 400, 400),
+            ]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $producto = Producto::where('sku', 'PRD-IMG')->firstOrFail();
+        $rutaAnterior = $producto->imagen;
+        $this->archivosPublicos[] = $rutaAnterior;
+
+        $this->actingAs($this->adminUser())
+            ->put("/productos/{$producto->id}", $this->datosProducto([
+                'imagen' => UploadedFile::fake()->image('nueva.jpg', 500, 500),
+            ]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $producto->refresh();
+        $this->archivosPublicos[] = $producto->imagen;
+
+        $this->assertNotSame($rutaAnterior, $producto->imagen);
+        $this->assertFileDoesNotExist(public_path($rutaAnterior));
+        $this->assertFileExists(public_path($producto->imagen));
+    }
+
+    public function test_image_can_be_removed_from_the_product(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post('/productos', $this->datosProducto([
+                'imagen' => UploadedFile::fake()->image('foto.jpg', 400, 400),
+            ]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $producto = Producto::where('sku', 'PRD-IMG')->firstOrFail();
+        $rutaAnterior = $producto->imagen;
+        $this->archivosPublicos[] = $rutaAnterior;
+
+        $this->actingAs($this->adminUser())
+            ->put("/productos/{$producto->id}", $this->datosProducto(['quitar_imagen' => 1]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $this->assertNull($producto->fresh()->imagen);
+        $this->assertFileDoesNotExist(public_path($rutaAnterior));
+    }
+
+    public function test_deleting_a_product_deletes_its_image(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post('/productos', $this->datosProducto([
+                'imagen' => UploadedFile::fake()->image('foto.jpg', 400, 400),
+            ]), ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $producto = Producto::where('sku', 'PRD-IMG')->firstOrFail();
+        $rutaImagen = $producto->imagen;
+        $this->archivosPublicos[] = $rutaImagen;
+
+        $this->actingAs($this->adminUser())
+            ->delete("/productos/{$producto->id}", headers: ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $this->assertFileDoesNotExist(public_path($rutaImagen));
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function datosProducto(array $overrides = []): array
+    {
+        return array_merge([
+            'sku' => 'PRD-IMG',
+            'nombre' => 'Producto con imagen',
+            'categoria_id' => Categoria::factory()->create()->id,
+            'moneda_id' => Moneda::factory()->create()->id,
+            'precio_costo' => 1.50,
+            'precio_venta' => 3.00,
+            'unidad_medida' => 'PZA',
+        ], $overrides);
+    }
+
+    /**
+     * Genera un PNG con ruido para superar el límite de 1 MB.
+     */
+    private function crearImagenPngPesada(): string
+    {
+        $lado = 1400;
+        $imagen = imagecreatetruecolor($lado, $lado);
+
+        for ($i = 0; $i < 12000; $i++) {
+            $x = random_int(0, $lado - 16);
+            $y = random_int(0, $lado - 16);
+            $color = imagecolorallocate(
+                $imagen,
+                random_int(0, 255),
+                random_int(0, 255),
+                random_int(0, 255)
+            );
+            imagefilledrectangle($imagen, $x, $y, $x + 15, $y + 15, $color);
+        }
+
+        $ruta = sys_get_temp_dir().DIRECTORY_SEPARATOR.'producto-pesada-'.uniqid().'.png';
+        imagepng($imagen, $ruta, 0);
+        imagedestroy($imagen);
+
+        $this->archivosTemporales[] = $ruta;
+
+        return $ruta;
     }
 }

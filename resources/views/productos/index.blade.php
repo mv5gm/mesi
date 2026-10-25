@@ -22,6 +22,7 @@
                 <tr>
                     <th>SKU</th>
                     <th>Nombre</th>
+                    <th>Imagen</th>
                     <th>Categoría</th>
                     <th>Precio costo</th>
                     <th>Precio venta</th>
@@ -64,6 +65,42 @@
                         autocomplete="off"
                         class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
+                </div>
+
+                <div>
+                    <span class="block text-sm font-medium">Imagen del producto</span>
+                    <div class="mt-1 flex flex-wrap items-center gap-4">
+                        <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-300 bg-gray-50">
+                            <img id="register-imagen-preview" src="" alt="Vista previa de la imagen" class="hidden h-full w-full object-cover">
+                            <svg id="register-imagen-placeholder" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 18.75h16.5a1.5 1.5 0 001.5-1.5V6.75a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v10.5a1.5 1.5 0 001.5 1.5z" />
+                            </svg>
+                        </div>
+                        <div class="space-y-2">
+                            <input id="register-imagen" type="file" name="imagen" accept="image/*" class="hidden">
+                            <input id="register-camera-input" type="file" accept="image/*" capture="environment" class="hidden">
+                            <input id="register-quitar-imagen" type="hidden" name="quitar_imagen" value="0">
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="document.getElementById('register-imagen').click()" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5 7.5 12M12 7.5V21" />
+                                    </svg>
+                                    Subir imagen
+                                </button>
+                                <button type="button" onclick="abrirCamara('register')" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                                    </svg>
+                                    Tomar foto
+                                </button>
+                                <button type="button" id="register-imagen-quitar" onclick="quitarImagen('register')" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100">
+                                    Quitar
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500">JPG, PNG o WebP. Si supera 1 MB se optimiza automáticamente.</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -228,6 +265,42 @@
                     <input id="edit-nombre" type="text" name="nombre" required autocomplete="off" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
                 </div>
 
+                <div>
+                    <span class="block text-sm font-medium">Imagen del producto</span>
+                    <div class="mt-1 flex flex-wrap items-center gap-4">
+                        <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-300 bg-gray-50">
+                            <img id="edit-imagen-preview" src="" alt="Vista previa de la imagen" class="hidden h-full w-full object-cover">
+                            <svg id="edit-imagen-placeholder" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 18.75h16.5a1.5 1.5 0 001.5-1.5V6.75a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v10.5a1.5 1.5 0 001.5 1.5z" />
+                            </svg>
+                        </div>
+                        <div class="space-y-2">
+                            <input id="edit-imagen" type="file" name="imagen" accept="image/*" class="hidden">
+                            <input id="edit-camera-input" type="file" accept="image/*" capture="environment" class="hidden">
+                            <input id="edit-quitar-imagen" type="hidden" name="quitar_imagen" value="0">
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="document.getElementById('edit-imagen').click()" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5 7.5 12M12 7.5V21" />
+                                    </svg>
+                                    Subir imagen
+                                </button>
+                                <button type="button" onclick="abrirCamara('edit')" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                                    </svg>
+                                    Tomar foto
+                                </button>
+                                <button type="button" id="edit-imagen-quitar" onclick="quitarImagen('edit')" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100">
+                                    Quitar
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500">JPG, PNG o WebP. Si supera 1 MB se optimiza automáticamente.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                         <label for="edit-sku" class="block text-sm font-medium">SKU</label>
@@ -301,6 +374,103 @@
         </div>
     </div>
 
+    {{-- Modal ver --}}
+    <div id="view-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50" onclick="closeModal('view-modal')"></div>
+        <div class="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <h2 class="text-lg font-semibold">Detalle del producto</h2>
+                <button type="button" onclick="closeModal('view-modal')" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <div class="mb-5 flex flex-wrap items-center gap-4">
+                    <div class="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                        <img id="view-imagen" src="" alt="Imagen del producto" class="hidden h-full w-full object-cover">
+                        <span id="view-imagen-placeholder" class="px-2 text-center text-xs text-gray-400">Sin imagen</span>
+                    </div>
+                    <div class="min-w-0">
+                        <p id="view-nombre" class="text-lg font-semibold text-gray-900"></p>
+                        <p id="view-sku-cabecera" class="mt-1 text-sm text-gray-500"></p>
+                    </div>
+                </div>
+
+                <table class="w-full text-sm">
+                    <tbody class="divide-y divide-gray-100">
+                        <tr>
+                            <th scope="row" class="w-1/3 py-2.5 pr-4 text-left font-medium text-gray-500">ID</th>
+                            <td id="view-id" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">SKU</th>
+                            <td id="view-sku" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Nombre</th>
+                            <td id="view-nombre-tabla" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Código de barras</th>
+                            <td id="view-codigo-barras" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Categoría</th>
+                            <td id="view-categoria" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Moneda</th>
+                            <td id="view-moneda" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Descripción</th>
+                            <td id="view-descripcion" class="whitespace-pre-line py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Precio de costo</th>
+                            <td id="view-precio-costo" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Precio de venta</th>
+                            <td id="view-precio-venta" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Precio de venta en bolívares</th>
+                            <td id="view-precio-venta-bolivares" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Stock actual</th>
+                            <td id="view-stock" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Stock mínimo</th>
+                            <td id="view-stock-minimo" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Stock máximo</th>
+                            <td id="view-stock-maximo" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Unidad de medida</th>
+                            <td id="view-unidad-medida" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row" class="py-2.5 pr-4 text-left font-medium text-gray-500">Fecha de creación</th>
+                            <td id="view-creado-en" class="py-2.5 text-gray-900"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex justify-end border-t border-gray-200 px-6 py-4">
+                <button type="button" onclick="closeModal('view-modal')" class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal eliminar --}}
     <div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/50" onclick="closeModal('delete-modal')"></div>
@@ -327,6 +497,37 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    {{-- Modal cámara --}}
+    <div id="camera-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60" onclick="cerrarCamara()"></div>
+        <div class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <h2 class="text-lg font-semibold">Tomar foto</h2>
+                <button type="button" onclick="cerrarCamara()" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="px-6 py-5">
+                <div class="relative overflow-hidden rounded-xl bg-black">
+                    <video id="camera-video" autoplay playsinline muted class="max-h-[55vh] w-full object-contain"></video>
+                </div>
+                <canvas id="camera-canvas" class="hidden"></canvas>
+                <p id="camera-error" class="mt-3 hidden rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"></p>
+                <p class="mt-3 text-xs text-gray-500">Enfoca el producto y presiona «Capturar foto».</p>
+            </div>
+            <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                <button type="button" onclick="cerrarCamara()" class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                    Cancelar
+                </button>
+                <button type="button" onclick="capturarFoto()" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+                    Capturar foto
+                </button>
+            </div>
         </div>
     </div>
 
@@ -378,6 +579,13 @@
         }
         #productos-table_wrapper .dataTables_processing {
             color: #374151;
+        }
+        .producto-imagen {
+            height: 3rem;
+            width: 3rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            object-fit: cover;
         }
     </style>
         <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -460,6 +668,139 @@
             overlay.classList.remove('flex');
         }
 
+        const imagenObjectUrls = {};
+
+        function liberarVistaPrevia(modo) {
+            if (imagenObjectUrls[modo]) {
+                URL.revokeObjectURL(imagenObjectUrls[modo]);
+                delete imagenObjectUrls[modo];
+            }
+        }
+
+        function actualizarVistaPrevia(modo, url, objectUrl = false) {
+            const preview = document.getElementById(modo + '-imagen-preview');
+            const placeholder = document.getElementById(modo + '-imagen-placeholder');
+            const quitar = document.getElementById(modo + '-imagen-quitar');
+
+            liberarVistaPrevia(modo);
+
+            if (objectUrl) {
+                imagenObjectUrls[modo] = url;
+            }
+
+            if (!url) {
+                preview.removeAttribute('src');
+                preview.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                quitar.classList.add('hidden');
+                return;
+            }
+
+            preview.src = url;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            quitar.classList.remove('hidden');
+        }
+
+        function previsualizarArchivo(modo, archivo) {
+            actualizarVistaPrevia(modo, URL.createObjectURL(archivo), true);
+        }
+
+        function asignarArchivo(modo, archivo) {
+            const input = document.getElementById(modo + '-imagen');
+
+            try {
+                const transferencia = new DataTransfer();
+                transferencia.items.add(archivo);
+                input.files = transferencia.files;
+            } catch (error) {
+                input.value = '';
+            }
+
+            document.getElementById(modo + '-quitar-imagen').value = '0';
+            previsualizarArchivo(modo, archivo);
+        }
+
+        function quitarImagen(modo) {
+            document.getElementById(modo + '-imagen').value = '';
+            document.getElementById(modo + '-camera-input').value = '';
+            document.getElementById(modo + '-quitar-imagen').value = '1';
+            actualizarVistaPrevia(modo, null);
+        }
+
+        let cameraStream = null;
+        let cameraModo = 'register';
+
+        window.abrirCamara = async function (modo) {
+            cameraModo = modo;
+            const cameraInput = document.getElementById(modo + '-camera-input');
+
+            if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+                cameraInput.click();
+                return;
+            }
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' } },
+                    audio: false,
+                });
+
+                const video = document.getElementById('camera-video');
+                video.srcObject = cameraStream;
+                document.getElementById('camera-error').classList.add('hidden');
+                openModal('camera-modal');
+            } catch (error) {
+                cameraInput.click();
+            }
+        };
+
+        window.cerrarCamara = function () {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach((track) => track.stop());
+                cameraStream = null;
+            }
+
+            const video = document.getElementById('camera-video');
+
+            if (video) {
+                video.srcObject = null;
+            }
+
+            closeModal('camera-modal');
+        };
+
+        window.capturarFoto = function () {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('camera-canvas');
+            const errorEl = document.getElementById('camera-error');
+
+            if (!video.videoWidth || !video.videoHeight) {
+                errorEl.textContent = 'La cámara aún no está lista. Espera un momento e intenta de nuevo.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const ladoMaximo = 1600;
+            const escala = Math.min(1, ladoMaximo / Math.max(video.videoWidth, video.videoHeight));
+            canvas.width = Math.round(video.videoWidth * escala);
+            canvas.height = Math.round(video.videoHeight * escala);
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    errorEl.textContent = 'No se pudo capturar la foto. Intenta de nuevo.';
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+
+                const archivo = new File([blob], 'foto-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                asignarArchivo(cameraModo, archivo);
+                cerrarCamara();
+                toast('Foto lista para guardar.');
+            }, 'image/jpeg', 0.92);
+        };
+
         function renderErrors(containerId, errors) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -500,6 +841,10 @@
             document.getElementById('register-form').reset();
             buildOptions(document.getElementById('register-categoria-id'), categoriaOptions, '', 'Selecciona una categoría');
             buildOptions(document.getElementById('register-moneda-id'), monedaOptions, monedaBaseId, 'Selecciona una moneda');
+            document.getElementById('register-imagen').value = '';
+            document.getElementById('register-camera-input').value = '';
+            document.getElementById('register-quitar-imagen').value = '0';
+            actualizarVistaPrevia('register', null);
             actualizarEquivalenteBolivares('register');
             clearErrors('register-errors');
             openModal('register-modal');
@@ -507,6 +852,10 @@
 
         window.openEditModal = function (button) {
             const form = document.getElementById('edit-form');
+            document.getElementById('edit-imagen').value = '';
+            document.getElementById('edit-camera-input').value = '';
+            document.getElementById('edit-quitar-imagen').value = '0';
+            actualizarVistaPrevia('edit', button.dataset.imagen || null);
             form.elements['sku'].value = button.dataset.sku || '';
             form.elements['codigo_barras'].value = button.dataset.codigoBarras || '';
             form.elements['nombre'].value = button.dataset.nombre;
@@ -525,6 +874,65 @@
         };
 
         let deleteProductoId = null;
+
+        function establecerTexto(id, valor, textoVacio = '—') {
+            const elemento = document.getElementById(id);
+
+            if (!elemento) {
+                return;
+            }
+
+            const texto = valor === null || valor === undefined || String(valor).trim() === ''
+                ? textoVacio
+                : String(valor);
+
+            elemento.textContent = texto;
+        }
+
+        window.openViewModal = function (button) {
+            const datos = button.dataset;
+            const unidades = {
+                PZA: 'PZA (Unidad)',
+                CAJA: 'CAJA',
+                LT: 'LT (Litro)',
+                KG: 'KG (Kilogramo)',
+                UND: 'UND (Und.)',
+            };
+
+            establecerTexto('view-id', datos.id);
+            establecerTexto('view-sku', datos.sku);
+            establecerTexto('view-sku-cabecera', datos.sku ? 'SKU: ' + datos.sku : '');
+            establecerTexto('view-nombre', datos.nombre);
+            establecerTexto('view-nombre-tabla', datos.nombre);
+            establecerTexto('view-codigo-barras', datos.codigoBarras);
+            establecerTexto('view-categoria', datos.categoriaNombre);
+            establecerTexto('view-moneda', datos.moneda);
+            establecerTexto('view-descripcion', datos.descripcion, 'Sin descripción');
+            establecerTexto('view-precio-costo', datos.precioCosto);
+            establecerTexto('view-precio-venta', datos.precioVenta);
+            establecerTexto('view-precio-venta-bolivares', datos.precioVentaBolivares);
+            establecerTexto('view-stock', datos.stock);
+            establecerTexto('view-stock-minimo', datos.stockMinimo);
+            establecerTexto('view-stock-maximo', datos.stockMaximo, 'Sin límite');
+            establecerTexto('view-unidad-medida', unidades[datos.unidadMedida] || datos.unidadMedida);
+            establecerTexto('view-creado-en', datos.creadoEn);
+
+            const imagen = document.getElementById('view-imagen');
+            const placeholder = document.getElementById('view-imagen-placeholder');
+
+            if (datos.imagen) {
+                imagen.src = datos.imagen;
+                imagen.alt = 'Imagen de ' + (datos.nombre || 'producto');
+                imagen.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+            } else {
+                imagen.removeAttribute('src');
+                imagen.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+            }
+
+            openModal('view-modal');
+        };
 
         window.openDeleteModal = function (button) {
             deleteProductoId = button.dataset.id;
@@ -564,6 +972,7 @@
                 columns: [
                     { data: 'sku' },
                     { data: 'nombre' },
+                    { data: 'imagen', orderable: false, searchable: false },
                     { data: 'categoria', orderable: false },
                     { data: 'precio_costo' },
                     {
@@ -589,6 +998,21 @@
             ['register', 'edit'].forEach((modo) => {
                 document.getElementById(modo + '-precio-venta').addEventListener('input', () => actualizarEquivalenteBolivares(modo));
                 document.getElementById(modo + '-moneda-id').addEventListener('change', () => actualizarEquivalenteBolivares(modo));
+
+                document.getElementById(modo + '-imagen').addEventListener('change', function () {
+                    if (this.files && this.files[0]) {
+                        document.getElementById(modo + '-quitar-imagen').value = '0';
+                        previsualizarArchivo(modo, this.files[0]);
+                    }
+                });
+
+                document.getElementById(modo + '-camera-input').addEventListener('change', function () {
+                    if (this.files && this.files[0]) {
+                        asignarArchivo(modo, this.files[0]);
+                    }
+
+                    this.value = '';
+                });
             });
 
             function submitForm(formId, overlayId, modalId) {

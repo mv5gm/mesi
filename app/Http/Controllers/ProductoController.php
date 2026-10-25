@@ -5,14 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Categoria;
 use App\Models\Moneda;
 use App\Models\Producto;
+use App\Services\ImagenProductoService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ProductoController extends Controller
 {
+    public function __construct(private readonly ImagenProductoService $imagenes) {}
+
     public function index(): View
     {
         return view('productos.index', [
@@ -27,7 +31,7 @@ class ProductoController extends Controller
     public function data(Request $request): JsonResponse
     {
         $productos = Producto::query()
-            ->with(['categoria:id,nombre', 'moneda:id,simbolo'])
+            ->with(['categoria:id,nombre', 'moneda:id,codigo,nombre,simbolo'])
             ->withSum('existencias', 'cantidad');
 
         $recordsTotal = $productos->count();
@@ -47,9 +51,9 @@ class ProductoController extends Controller
         $columnMap = [
             0 => 'sku',
             1 => 'nombre',
-            3 => 'precio_costo',
-            4 => 'precio_venta',
-            5 => 'existencias_sum_cantidad',
+            4 => 'precio_costo',
+            5 => 'precio_venta',
+            6 => 'existencias_sum_cantidad',
         ];
         $column = $columnMap[$request->integer('order.0.column')] ?? 'nombre';
         $direction = $request->string('order.0.dir')->toString() === 'desc' ? 'desc' : 'asc';
@@ -64,21 +68,35 @@ class ProductoController extends Controller
         $tasas = Moneda::tasasVigentes();
         $monedaBolivarId = Moneda::where('codigo', 'VES')->value('id');
 
-        $data = $productos->get()->map(fn (Producto $producto): array => [
-            'sku' => e($producto->sku),
-            'nombre' => e($producto->nombre),
-            'categoria' => $producto->categoria
-                ? e($producto->categoria->nombre)
-                : '<span class="text-gray-400">—</span>',
-            'precio_costo' => $this->formatoPrecio($producto->precio_costo, $producto->moneda?->simbolo),
-            'precio_venta' => $this->formatoPrecio($producto->precio_venta, $producto->moneda?->simbolo),
-            'precio_venta_bolivares' => $this->formatoPrecio(
+        $data = $productos->get()->map(function (Producto $producto) use ($tasas, $monedaBolivarId): array {
+            $precioCosto = $this->formatoPrecio($producto->precio_costo, $producto->moneda?->simbolo);
+            $precioVenta = $this->formatoPrecio($producto->precio_venta, $producto->moneda?->simbolo);
+            $precioVentaBolivares = $this->formatoPrecio(
                 $this->convertirABolivares((float) $producto->precio_venta, $producto->moneda_id, $tasas, $monedaBolivarId),
                 'Bs.'
-            ),
-            'stock' => (int) $producto->existencias_sum_cantidad,
-            'actions' => view('productos.partials.actions', ['producto' => $producto])->render(),
-        ]);
+            );
+
+            return [
+                'sku' => e($producto->sku),
+                'nombre' => e($producto->nombre),
+                'imagen' => $producto->imagen_url !== null
+                    ? '<img src="'.e($producto->imagen_url).'" alt="'.e($producto->nombre).'" class="producto-imagen">'
+                    : '<span class="text-gray-400">—</span>',
+                'categoria' => $producto->categoria
+                    ? e($producto->categoria->nombre)
+                    : '<span class="text-gray-400">—</span>',
+                'precio_costo' => $precioCosto,
+                'precio_venta' => $precioVenta,
+                'precio_venta_bolivares' => $precioVentaBolivares,
+                'stock' => (int) $producto->existencias_sum_cantidad,
+                'actions' => view('productos.partials.actions', [
+                    'producto' => $producto,
+                    'precioCosto' => $precioCosto,
+                    'precioVenta' => $precioVenta,
+                    'precioVentaBolivares' => $precioVentaBolivares,
+                ])->render(),
+            ];
+        });
 
         return response()->json([
             'draw' => $request->integer('draw'),
@@ -91,10 +109,11 @@ class ProductoController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $this->validarDatos($request);
+        $datos = $this->procesarImagen($validated, $request);
 
         $producto = Producto::create([
-            ...$validated,
-            'stock_minimo' => $validated['stock_minimo'] ?? 0,
+            ...$datos,
+            'stock_minimo' => $datos['stock_minimo'] ?? 0,
         ]);
 
         return response()->json([
@@ -106,10 +125,11 @@ class ProductoController extends Controller
     public function update(Request $request, Producto $producto): JsonResponse
     {
         $validated = $this->validarDatos($request, $producto);
+        $datos = $this->procesarImagen($validated, $request, $producto);
 
         $producto->update([
-            ...$validated,
-            'stock_minimo' => $validated['stock_minimo'] ?? 0,
+            ...$datos,
+            'stock_minimo' => $datos['stock_minimo'] ?? 0,
         ]);
 
         return response()->json(['message' => 'Producto actualizado correctamente.']);
@@ -126,6 +146,7 @@ class ProductoController extends Controller
             ], 422);
         }
 
+        $this->imagenes->eliminar($producto->imagen);
         $producto->delete();
 
         return response()->json(['message' => 'Producto eliminado correctamente.']);
@@ -146,6 +167,8 @@ class ProductoController extends Controller
             'codigo_barras' => ['nullable', 'string', 'max:100', $barrasUnique],
             'nombre' => ['required', 'string', 'max:150'],
             'descripcion' => ['nullable', 'string'],
+            'imagen' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'quitar_imagen' => ['nullable', 'boolean'],
             'categoria_id' => ['required', 'integer', 'exists:categorias,id'],
             'moneda_id' => ['required', 'integer', 'exists:monedas,id'],
             'precio_costo' => ['required', 'numeric', 'min:0'],
@@ -158,6 +181,9 @@ class ProductoController extends Controller
             'sku.unique' => 'Ese SKU ya está registrado.',
             'codigo_barras.unique' => 'Ese código de barras ya está registrado.',
             'nombre.required' => 'El nombre es obligatorio.',
+            'imagen.image' => 'El archivo debe ser una imagen válida.',
+            'imagen.mimes' => 'La imagen debe ser de tipo JPG, PNG o WebP.',
+            'imagen.max' => 'La imagen no puede superar los 10 MB.',
             'categoria_id.required' => 'Debes seleccionar una categoría.',
             'categoria_id.exists' => 'La categoría seleccionada no es válida.',
             'moneda_id.required' => 'Debes seleccionar una moneda.',
@@ -168,6 +194,37 @@ class ProductoController extends Controller
             'precio_venta.min' => 'El precio de venta no puede ser negativo.',
             'stock_maximo.gte' => 'El stock máximo debe ser mayor o igual al stock mínimo.',
         ]);
+    }
+
+    /**
+     * Procesa la imagen enviada y devuelve los datos listos para guardar.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function procesarImagen(array $validated, Request $request, ?Producto $producto = null): array
+    {
+        $archivo = $validated['imagen'] ?? null;
+        $quitarImagen = $request->boolean('quitar_imagen');
+
+        unset($validated['imagen'], $validated['quitar_imagen']);
+
+        if ($archivo instanceof UploadedFile) {
+            $validated['imagen'] = $this->imagenes->guardar($archivo);
+
+            if ($producto?->imagen !== null) {
+                $this->imagenes->eliminar($producto->imagen);
+            }
+
+            return $validated;
+        }
+
+        if ($quitarImagen && $producto?->imagen !== null) {
+            $this->imagenes->eliminar($producto->imagen);
+            $validated['imagen'] = null;
+        }
+
+        return $validated;
     }
 
     /**
